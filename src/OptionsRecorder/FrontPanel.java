@@ -6,10 +6,12 @@ import java.awt.event.ActionListener;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Collections;
 import java.util.Dictionary;
 import java.util.Hashtable;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Scanner;
 import java.util.Map.Entry;
@@ -76,10 +78,13 @@ public class FrontPanel extends JFrame implements EWrapper {
 	int min_expiration = 99999999;
 	int temp_conID;
 	
-	Dictionary<Integer, String> order_dict = new Hashtable<>();
-	Dictionary<Integer, Integer> strike_dict = new Hashtable<>();
-	Dictionary<Integer, Integer> index_dict = new Hashtable<>();
-	Dictionary<Integer, Integer> secDef_dict = new Hashtable<>();
+	Dictionary<Integer, String> ticker_dict= new Hashtable<>();
+	Dictionary<Integer, Double> strike_dict= new Hashtable<>();
+	Dictionary<Integer, Integer> secDef_dict= new Hashtable<>();
+	Dictionary<Integer, Integer> index_dict= new Hashtable<>();
+	Dictionary<Integer, Integer> underlying_option_dict = new Hashtable<>();
+	
+	int window = 20;	
 	
 	int num_securities = 0;
 	
@@ -90,16 +95,51 @@ public class FrontPanel extends JFrame implements EWrapper {
 	
 	int nextID;
 	
+	String todays_date = formatDate();
+	
 	FrontPanel() throws FileNotFoundException {
 		
 		get_account_info();
 		create_futures();
 		create_panel();
 		
-
-				
 	}
 	
+	private String formatDate() {
+		// gets today's date and finds if tomorrow is next expiration and converts to string
+
+		Calendar currentDate = Calendar.getInstance(Locale.ENGLISH); //Get the current date
+		int hourOfDay = currentDate.get(Calendar.HOUR_OF_DAY);
+		int minOfHour = currentDate.get(Calendar.MINUTE);
+		
+		if (hourOfDay >= 13) {
+			currentDate.add(Calendar.DATE, 1);
+		}
+		String year = String.valueOf(currentDate.get(Calendar.YEAR));
+		String month = "";
+		String day = "";
+		int monthOfYear = currentDate.get(Calendar.MONTH);
+		int dayOfMonth = currentDate.get(Calendar.DAY_OF_MONTH);
+		
+		monthOfYear++;
+		
+		if (monthOfYear < 10) {
+			month = "0" + String.valueOf(monthOfYear);			
+		}
+		else {
+			month = String.valueOf(monthOfYear);
+		}
+		if (dayOfMonth < 10) {
+			day = "0" + String.valueOf(dayOfMonth);			
+		}
+		else {
+			day = String.valueOf(dayOfMonth);
+		}
+		
+		String te = year + month + day;
+		return te;
+	}
+
 	protected void get_account_info() throws FileNotFoundException {
 		// Get the account number from the local text file
 		
@@ -200,6 +240,15 @@ public class FrontPanel extends JFrame implements EWrapper {
 			}
 		});
 		
+		JButton UnderlyingButton = new JButton();
+		UnderlyingButton.setText("Underlying Price");
+		buttonPanel.add(UnderlyingButton);
+		UnderlyingButton.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				onUnderlyingPrice();
+			}
+		});
+		
 		JButton OptionChainButton = new JButton();
 		OptionChainButton.setText("Option Info");
 		buttonPanel.add(OptionChainButton);
@@ -288,11 +337,14 @@ public class FrontPanel extends JFrame implements EWrapper {
 
 	void onReqSecDefButton() {
 		
+		// Request the info of the underlying contract to get the condID and expiration 
+		
 		long t1, t2;
 		Contract contract = new Contract();
 		
 		for (int i=0;i<num_securities;i++) {
 			min_expiration = 99999999;
+			
 			contract.symbol(Security_data[i].ticker);
 			//contract.symbol("ES");
 			contract.secType(Security_data[i].security_type);
@@ -301,12 +353,10 @@ public class FrontPanel extends JFrame implements EWrapper {
 			contract.exchange(Security_data[i].exchange);
 			//contract.exchange("CME");
 
-			//contract.lastTradeDateOrContractMonth("20240621");
-
-
-			System.out.println("Line 247");
+			// System.out.println("Line 247");
 			m_client.reqContractDetails(nextID,contract);
 			secDef_dict.put(nextID, i);
+			
 			nextID++;
 			t1 = System.currentTimeMillis();
 			do {
@@ -315,7 +365,40 @@ public class FrontPanel extends JFrame implements EWrapper {
 		}
 		debugPrint(297);
 		m_messages.add("Complete requesting Underlying");
+		for (int i=0;i<num_securities;i++) {
+			
+		}
+	}
+	
+	void onUnderlyingPrice() {
+		// This gets the underlying price of each asset so it knows what options to request
 		
+		long t1, t2;
+		Contract contract = new Contract();
+		
+		for (int i=0;i<num_securities;i++) {
+			contract.symbol(Security_data[i].ticker);
+			contract.secType("FUT");
+			contract.currency("USD");
+			contract.exchange(Security_data[i].exchange);
+			contract.lastTradeDateOrContractMonth(String.valueOf(Security_data[i].expiration));
+			contract.conid(Security_data[i].conID);
+			contract.multiplier(String.valueOf(Security_data[i].multiplier));
+			index_dict.put(nextID, i);
+			underlying_option_dict.put(nextID, 1);
+			m_client.reqMktData(nextID,contract,"",false,false,null);
+			
+			t1 = System.currentTimeMillis();
+			do {
+				t2 = System.currentTimeMillis();
+			} while (t2 - t1 < 1000);
+			m_client.cancelMktData(nextID);
+			nextID++;
+		}
+
+		
+		m_messages.add("Complete requesting Underlying Price");
+				
 	}
 	
 	void onOptionChainButton() {
@@ -347,6 +430,11 @@ public class FrontPanel extends JFrame implements EWrapper {
 			}
 		}
 		
+		for (int i=0;i<num_securities;i++) {
+			Security_data[i].requested_strikes = new double[window];
+			Security_data[i].process_strikes(window);
+		}
+		
 		m_messages.add("Complete requesting Option Chains");
 		
 	}
@@ -355,38 +443,28 @@ public class FrontPanel extends JFrame implements EWrapper {
 		// Hopefully this gets the entire option chain streaming through
 		
 		for (int i = 0; i < 2; i++) {
-		int strike;
+		double strike;
 		if (i==0) {
-			strike = 5310;
+			strike = 5260;
 		}
 		else {
-			strike = 18920;
+			strike = 18710;
 		}
 		Contract contract = new Contract();
 		contract.symbol(Security_data[i].ticker);
 		contract.secType("FOP");
 		contract.currency("USD");
 		contract.exchange("CME");
-		contract.lastTradeDateOrContractMonth("20240529");
+		contract.lastTradeDateOrContractMonth(todays_date);
 		contract.strike(strike);
 		contract.right("PUT");
 		contract.multiplier(String.valueOf(Security_data[i].multiplier));
 		m_client.reqMktData(nextID,contract,"",false,false,null);
+		index_dict.put(nextID, i);
+		underlying_option_dict.put(nextID, 0);
 		strike_dict.put(nextID, strike);
-		order_dict.put(nextID,Security_data[i].ticker);
-		index_dict.put(nextID,i);
 		nextID++;
-		/*
-		contract.symbol("ES");
-		contract.secType("FOP");
-		contract.currency("USD");
-		contract.exchange("CME");
-		contract.lastTradeDateOrContractMonth("20240524");
-		contract.strike(strike);
-		contract.right("CALL");
-		contract.multiplier(String.valueOf(Security_data[i].multiplier));
-		m_client.reqMktData(nextID,contract,"",false,false,null);
-		nextID++;*/
+
 		}
 	}
 	
@@ -394,11 +472,24 @@ public class FrontPanel extends JFrame implements EWrapper {
 	@Override
 	public void tickPrice(int tickerId, int field, double price, TickAttrib attrib) {
 		// TODO Auto-generated method stub
+
 		if (field == 1) {
-			System.out.println(order_dict.get(tickerId) + " Bid = " + price);
+			if (underlying_option_dict.get(tickerId) == 1) {
+				Security_data[index_dict.get(tickerId)].current_price = price;
+				System.out.println(Security_data[index_dict.get(tickerId)].ticker +
+						" " + " Underlying Price = " + price);
+			}
+			else {
+				System.out.println(Security_data[index_dict.get(tickerId)].ticker +
+						" " + " Strike = " + " " + strike_dict.get(tickerId) + " Bid = " + price);
+			}
 		}
 		else if (field == 2) {
-			System.out.println(order_dict.get(tickerId) + " Ask = " + price);
+			if (underlying_option_dict.get(tickerId) != 1) {
+				System.out.println(Security_data[index_dict.get(tickerId)].ticker +
+					" " + " Strike = " + " " + strike_dict.get(tickerId) + " Ask = " + price);
+			}
+			
 		}
 	}
 
@@ -413,8 +504,8 @@ public class FrontPanel extends JFrame implements EWrapper {
 			double optPrice, double pvDividend, double gamma, double vega, double theta, double undPrice) {
 		// TODO Auto-generated method stub
 		if (field == 13) {
-			System.out.println(tickerId + " Option Price = " + optPrice + " " + " Delta " + " " + delta + 
-					" underlying price = " + undPrice + " " + "ticker = " + order_dict.get(tickerId));
+			System.out.println(Security_data[index_dict.get(tickerId)].ticker + " Option Price = " + optPrice + " " + " Delta " + " " + delta + 
+					" underlying price = " + undPrice);
 		}
 		
 		
@@ -500,14 +591,14 @@ public class FrontPanel extends JFrame implements EWrapper {
 	@Override
 	public void contractDetails(int reqId, ContractDetails contractDetails) {
 		// TODO Auto-generated method stub
-		System.out.println(contractDetails);
-		//System.out.println(contractDetails.realExpirationDate());
+		System.out.println(contractDetails.realExpirationDate());
 		//int index = findIndexofTicker(contractDetails.marketName());
 		int index = secDef_dict.get(reqId);
+		
 		if (Integer.valueOf(contractDetails.realExpirationDate()) < min_expiration) {
 			min_expiration = Integer.valueOf(contractDetails.realExpirationDate());
 			Security_data[index].conID = contractDetails.conid();
-			Security_data[index].expiration = contractDetails.realExpirationDate();
+			Security_data[index].expiration = min_expiration;			
 		}
 	}
 

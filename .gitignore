@@ -4,6 +4,9 @@ Account.txt
 # API Files from IB 
 bin/
 bin/com/
+ib/
+bin/com/ib/controller/
+bin/com/ib/client/
 
 # Excel sheet for checking algorithm
 index.xlsx

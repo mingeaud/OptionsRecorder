@@ -1,2 +1,9 @@
-# FIle that holds the Account number
+# File that holds the Account number
 Account.txt
+
+# API Files from IB 
+bin/
+bin/com/
+
+# Excel sheet for checking algorithm
+index.xlsx

@@ -83,6 +83,7 @@ public class FrontPanel extends JFrame implements EWrapper {
 	Dictionary<Integer, Integer> secDef_dict= new Hashtable<>();
 	Dictionary<Integer, Integer> index_dict= new Hashtable<>();
 	Dictionary<Integer, Integer> underlying_option_dict = new Hashtable<>();
+	Dictionary<Integer, String> put_call_dict = new Hashtable<>();
 	
 	int window = 20;	
 	
@@ -275,6 +276,15 @@ public class FrontPanel extends JFrame implements EWrapper {
 				onDisconnect();
 			}
 		});
+		
+		JButton HistoryButton = new JButton();
+		HistoryButton.setText("History");
+		buttonPanel.add(HistoryButton);
+		HistoryButton.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				onHistory();
+			}
+		});
 
 	}
 	
@@ -282,6 +292,25 @@ public class FrontPanel extends JFrame implements EWrapper {
 		messagePanel = new JPanel();
 		messagePanel.setLayout(new GridLayout(0, 1));
 		messagePanel.add(m_messages);
+	}
+	
+	void onHistory() {
+		// This is just checking to see if requesting the options hisotyry is a better method
+		Contract contract = new Contract();
+		contract.symbol("NQ");
+		contract.secType("FOP");
+		contract.currency("USD");
+		contract.exchange("CME");
+		contract.conid(687507953);
+		contract.multiplier("20");
+		contract.strike(18500);
+		
+		m_client.reqHistoricalData(nextID, contract, "", "1 D", "1 min", "TRADES", 1, 1, false, null);	
+		nextID++;
+		
+		System.out.println(" I tried to get historical data");
+		
+		
 	}
 	
 	void onConnect() {
@@ -426,7 +455,7 @@ public class FrontPanel extends JFrame implements EWrapper {
 			int len = strikes_list.size();
 			Security_data[index].strikes = new double[len];
 			for (int j = 0; j < len; j++){
-				Security_data[index].strikes[j] = strikes_list.get(j); 
+				Security_data[index].strikes[j] = strikes_list.get(j);
 			}
 		}
 		
@@ -442,28 +471,36 @@ public class FrontPanel extends JFrame implements EWrapper {
 	void onOptionPriceButton() {
 		// Hopefully this gets the entire option chain streaming through
 		
-		for (int i = 0; i < 2; i++) {
-		double strike;
-		if (i==0) {
-			strike = 5260;
-		}
-		else {
-			strike = 18710;
-		}
-		Contract contract = new Contract();
-		contract.symbol(Security_data[i].ticker);
-		contract.secType("FOP");
-		contract.currency("USD");
-		contract.exchange("CME");
-		contract.lastTradeDateOrContractMonth(todays_date);
-		contract.strike(strike);
-		contract.right("PUT");
-		contract.multiplier(String.valueOf(Security_data[i].multiplier));
-		m_client.reqMktData(nextID,contract,"",false,false,null);
-		index_dict.put(nextID, i);
-		underlying_option_dict.put(nextID, 0);
-		strike_dict.put(nextID, strike);
-		nextID++;
+		for (int i = 0; i < num_securities; i++) {
+			for (int j = 0; j < window; j++) {
+				Contract contract = new Contract();
+				contract.symbol(Security_data[i].ticker);
+				contract.secType("FOP");
+				contract.currency("USD");
+				contract.exchange("CME");
+				contract.lastTradeDateOrContractMonth(todays_date);
+				contract.strike(Security_data[i].requested_strikes[j]);
+				contract.multiplier(String.valueOf(Security_data[i].multiplier));
+				
+				// First Request the PUT
+				contract.right("PUT");
+				put_call_dict.put(nextID, "PUT");
+				index_dict.put(nextID, i);
+				underlying_option_dict.put(nextID, 0);
+				strike_dict.put(nextID, Security_data[i].requested_strikes[j]);
+				m_client.reqMktData(nextID,contract,"",false,false,null);
+				nextID++;
+				
+				// Then Request the Call
+				contract.right("CALL");
+				put_call_dict.put(nextID, "CALL");
+				index_dict.put(nextID, i);
+				underlying_option_dict.put(nextID, 0);
+				strike_dict.put(nextID, Security_data[i].requested_strikes[j]);
+				m_client.reqMktData(nextID,contract,"",false,false,null);
+				nextID++;
+			}
+
 
 		}
 	}
@@ -481,14 +518,17 @@ public class FrontPanel extends JFrame implements EWrapper {
 			}
 			else {
 				System.out.println(Security_data[index_dict.get(tickerId)].ticker +
+						"" + put_call_dict.get(tickerId) + 
 						" " + " Strike = " + " " + strike_dict.get(tickerId) + " Bid = " + price);
 			}
 		}
 		else if (field == 2) {
+			/*
 			if (underlying_option_dict.get(tickerId) != 1) {
 				System.out.println(Security_data[index_dict.get(tickerId)].ticker +
 					" " + " Strike = " + " " + strike_dict.get(tickerId) + " Ask = " + price);
 			}
+			*/
 			
 		}
 	}
@@ -660,7 +700,12 @@ public class FrontPanel extends JFrame implements EWrapper {
 	@Override
 	public void historicalData(int reqId, Bar bar) {
 		// TODO Auto-generated method stub
-		
+		System.out.println("HistoricalData. " + reqId +
+				" - Time: " + bar.time() +
+				", Open: " + bar.open() +
+				", High: " + bar.high() + 
+                ", Low: " + bar.low() +
+                ", Close: " + bar.close());
 	}
 
 	@Override
@@ -889,6 +934,7 @@ public class FrontPanel extends JFrame implements EWrapper {
 	@Override
 	public void historicalDataEnd(int reqId, String startDateStr, String endDateStr) {
 		// TODO Auto-generated method stub
+		System.out.println("Historical Data End");
 		
 	}
 
@@ -1094,6 +1140,10 @@ public class FrontPanel extends JFrame implements EWrapper {
 			if (conID == Security_data[i].conID) {
 				index = i;
 			}
+		}
+		
+		if (index == -1) {
+			System.out.println("Something went wrong on line 1112" + conID);
 		}
 		
 		return index;

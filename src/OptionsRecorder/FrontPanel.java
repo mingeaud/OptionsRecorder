@@ -3,8 +3,11 @@ package OptionsRecorder;
 import java.awt.GridLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
@@ -21,6 +24,7 @@ import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JPanel;
 import javax.swing.JTabbedPane;
+import javax.swing.JTable;
 
 import com.ib.client.Bar;
 import com.ib.client.CommissionReport;
@@ -72,6 +76,8 @@ public class FrontPanel extends JFrame implements EWrapper {
 	
 	Security[] Security_data;
 	
+	int acctPaneNumRows = 2, acctPaneNumColumns = 7;
+	
 	// Just testing an idea on how to parse the option chain response
 	String temp_ticker;
 	ArrayList<Double> strikes_list = new ArrayList<Double>();
@@ -80,16 +86,20 @@ public class FrontPanel extends JFrame implements EWrapper {
 	
 	Dictionary<Integer, String> ticker_dict= new Hashtable<>();
 	Dictionary<Integer, Double> strike_dict= new Hashtable<>();
+	Dictionary<Integer, Integer> strike_to_window_dict = new Hashtable<>();
 	Dictionary<Integer, Integer> secDef_dict= new Hashtable<>();
 	Dictionary<Integer, Integer> index_dict= new Hashtable<>();
 	Dictionary<Integer, Integer> underlying_option_dict = new Hashtable<>();
 	Dictionary<Integer, String> put_call_dict = new Hashtable<>();
 	
-	int window = 20;	
+	int window = 20;
+	int accountKeyCounter = 0;
+	int portfolioRowNumber = 0;
 	
 	int num_securities = 0;
 	
 	JPanel buttonPanel, messagePanel, mainPanel;
+	JTable acctPane;
 	int port_number;
 	
 	private boolean m_disconnectInProgress = false;
@@ -195,14 +205,17 @@ public class FrontPanel extends JFrame implements EWrapper {
 		frame.setSize(1800,900);
 		
 		createButtonPanel();
+		createAccountPanel();
 		createMessagePanel();
 		
 		buttonPanel.setBounds(0, 0, 120, 700);
+		acctPane.setBounds(130,10,250,200);
 		//mainPanel.setBounds(130, 0, 1750, 900);
 		
-		messagePanel.setBounds(260, 10, 500, 300);
+		messagePanel.setBounds(400, 10, 500, 300);
 		//mainPanel.add(messagePanel);
 		frame.add(buttonPanel);
+		frame.add(acctPane);
 		frame.add(messagePanel);
 		frame.setVisible(true);
 		
@@ -229,6 +242,15 @@ public class FrontPanel extends JFrame implements EWrapper {
 			public void actionPerformed(ActionEvent e) {
 				port_number = 4002;
 				//onGatewayButton();
+			}
+		});
+		
+		JButton RefreshButton = new JButton();
+		RefreshButton.setText("Refresh");
+		buttonPanel.add(RefreshButton);
+		RefreshButton.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				onRefreshButton();
 			}
 		});
 		
@@ -285,7 +307,70 @@ public class FrontPanel extends JFrame implements EWrapper {
 				onHistory();
 			}
 		});
+		
+		JButton PrintDataButton = new JButton();
+		PrintDataButton.setText("PrintDataButton");
+		buttonPanel.add(PrintDataButton);
+		PrintDataButton.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				try {
+					onPrint();
+				} catch (IOException e1) {
+					// TODO Auto-generated catch block
+					e1.printStackTrace();
+				}
+			}
+		});
 
+	}
+	
+	private void createAccountPanel(){
+		// Creates the account summary table
+		acctPane = new JTable(acctPaneNumColumns, 2);
+		for (int i = 0; i<2;i++){
+			acctPane.getColumnModel().getColumn(i).setPreferredWidth(5);
+		}
+}
+	
+	private void onPrint() throws IOException {
+		// WRites the data to seperate output files that have the data
+		
+		String file_name = "";
+		
+		for (int i = 0; i < num_securities; i++) {
+
+			file_name = Security_data[i].ticker + formatDate()+".txt"; 
+			File file = new File(file_name);
+			FileWriter fw;
+			fw = new FileWriter(file.getAbsoluteFile());
+			BufferedWriter bw = new BufferedWriter(fw);
+			
+			for (int j = 0; j < 2; j++) {
+				for (int k = 0; k < window; k++) {
+					for (int l=0;l<23*60;l++) {
+						if (j == 0) {
+							bw.write(
+									Security_data[i].ticker + " " +
+							"PUT " + Security_data[i].requested_strikes[k] + " Time index = " + l + " data = " +
+							Security_data[i].data[j][k][l][0] + " " + Security_data[i].data[j][k][l][1] + " " +
+							Security_data[i].data[j][k][l][2] + " " + Security_data[i].data[j][k][l][3] + " " +
+							Security_data[i].data[j][k][l][4] + " " + Security_data[i].data[j][k][l][5]);
+							bw.newLine();
+						}
+						else {
+							bw.write(
+									Security_data[i].ticker + " " +
+							"Call " + Security_data[i].requested_strikes[k] + " Time index = " + l + " data = " +
+							Security_data[i].data[j][k][l][0] + " " + Security_data[i].data[j][k][l][1] + " " +
+							Security_data[i].data[j][k][l][2] + " " + Security_data[i].data[j][k][l][3] + " " +
+							Security_data[i].data[j][k][l][4] + " " + Security_data[i].data[j][k][l][5]);
+							bw.newLine();							
+						}
+					}
+				}
+			}
+			bw.close();
+		}
 	}
 	
 	private void createMessagePanel() {
@@ -353,6 +438,34 @@ public class FrontPanel extends JFrame implements EWrapper {
 				error(e);
 			}
 		}
+	}
+	
+	protected void onRefreshButton() {
+		// Gets the account information
+
+				
+		// Reset the rows in the account pane and the portfolio pane
+		portfolioRowNumber = 1;
+		accountKeyCounter = 0;
+		
+		/*
+		for (int ii = 1; ii<portPaneNumRows;ii++){
+			for (int jj = 0; jj<portPaneNumColumns; jj++){
+				portPane.setValueAt("", ii, jj);
+			}
+		}*/
+		
+		m_client.reqAccountUpdates( true, account_number);
+		//System.out.println("The portfolio was updated " + portfolioCounter + " times");
+		
+		long t0,t1;
+		t0=System.currentTimeMillis();
+        do{
+            t1=System.currentTimeMillis();
+        }
+        while (t1-t0<1000);
+				
+		m_client.reqAccountUpdates( false, account_number);		
 	}
 	
 	void onDisconnect() {
@@ -462,6 +575,9 @@ public class FrontPanel extends JFrame implements EWrapper {
 		for (int i=0;i<num_securities;i++) {
 			Security_data[i].requested_strikes = new double[window];
 			Security_data[i].process_strikes(window);
+			//Security_data[i].data = new double [2][window][390][6];
+			Security_data[i].data = new double [2][window][23*60][6];
+			Security_data[i].initialize_data();
 		}
 		
 		m_messages.add("Complete requesting Option Chains");
@@ -488,6 +604,7 @@ public class FrontPanel extends JFrame implements EWrapper {
 				index_dict.put(nextID, i);
 				underlying_option_dict.put(nextID, 0);
 				strike_dict.put(nextID, Security_data[i].requested_strikes[j]);
+				strike_to_window_dict.put(nextID, j);
 				m_client.reqMktData(nextID,contract,"",false,false,null);
 				nextID++;
 				
@@ -497,6 +614,7 @@ public class FrontPanel extends JFrame implements EWrapper {
 				index_dict.put(nextID, i);
 				underlying_option_dict.put(nextID, 0);
 				strike_dict.put(nextID, Security_data[i].requested_strikes[j]);
+				strike_to_window_dict.put(nextID, j);
 				m_client.reqMktData(nextID,contract,"",false,false,null);
 				nextID++;
 			}
@@ -510,26 +628,23 @@ public class FrontPanel extends JFrame implements EWrapper {
 	public void tickPrice(int tickerId, int field, double price, TickAttrib attrib) {
 		// TODO Auto-generated method stub
 
-		if (field == 1) {
+		if (field == 4) {
 			if (underlying_option_dict.get(tickerId) == 1) {
 				Security_data[index_dict.get(tickerId)].current_price = price;
 				System.out.println(Security_data[index_dict.get(tickerId)].ticker +
 						" " + " Underlying Price = " + price);
 			}
 			else {
+				Calendar currentDate = Calendar.getInstance(Locale.ENGLISH); //Get the current date
+				int hourOfDay = currentDate.get(Calendar.HOUR_OF_DAY);
+				int minOfHour = currentDate.get(Calendar.MINUTE);
 				System.out.println(Security_data[index_dict.get(tickerId)].ticker +
 						"" + put_call_dict.get(tickerId) + 
-						" " + " Strike = " + " " + strike_dict.get(tickerId) + " Bid = " + price);
+						" " + " Strike = " + " " + strike_dict.get(tickerId) + " Bid = " + price + " "
+						+ hourOfDay + " " + minOfHour);
+				Security_data[index_dict.get(tickerId)].process_price_data(
+						put_call_dict.get(tickerId), hourOfDay, minOfHour, strike_to_window_dict.get(tickerId), price);
 			}
-		}
-		else if (field == 2) {
-			/*
-			if (underlying_option_dict.get(tickerId) != 1) {
-				System.out.println(Security_data[index_dict.get(tickerId)].ticker +
-					" " + " Strike = " + " " + strike_dict.get(tickerId) + " Ask = " + price);
-			}
-			*/
-			
 		}
 	}
 
@@ -544,8 +659,17 @@ public class FrontPanel extends JFrame implements EWrapper {
 			double optPrice, double pvDividend, double gamma, double vega, double theta, double undPrice) {
 		// TODO Auto-generated method stub
 		if (field == 13) {
+			Calendar currentDate = Calendar.getInstance(Locale.ENGLISH); //Get the current date
+			int hourOfDay = currentDate.get(Calendar.HOUR_OF_DAY);
+			int minOfHour = currentDate.get(Calendar.MINUTE);
 			System.out.println(Security_data[index_dict.get(tickerId)].ticker + " Option Price = " + optPrice + " " + " Delta " + " " + delta + 
 					" underlying price = " + undPrice);
+			Security_data[index_dict.get(tickerId)].process_delta_data(put_call_dict.get(tickerId),
+					hourOfDay,
+					minOfHour,
+					strike_to_window_dict.get(tickerId),
+					delta,
+					undPrice);
 		}
 		
 		
@@ -593,6 +717,74 @@ public class FrontPanel extends JFrame implements EWrapper {
 	@Override
 	public void updateAccountValue(String key, String value, String currency, String accountName) {
 		// TODO Auto-generated method stub
+		//System.out.println(key + " " + value + " " + accountName + " " + keyCounter);
+				//if (keyCounter == 32){
+				if (key.equals("ExcessLiquidity")){
+					//acctPaneTitles.add(key);
+					//acctPaneValues[acctPaneValuesCounter] = Double.parseDouble(value);
+					//acctPaneValuesCounter = acctPaneValuesCounter + 1;
+					acctPane.setValueAt(key, 0, 0);
+					acctPane.setValueAt(value, 0, 1);
+					//accountCounter = accountCounter + 1;
+					//System.out.println(key + " " + value + " " + keyCounter + " " + sdf.format(cal.getTime()));
+				}
+				if (key.equals("InitMarginReq")){
+				//if (keyCounter == 62){
+					//acctPaneTitles.add(key);
+					//acctPaneValues[acctPaneValuesCounter] = Double.parseDouble(value);
+					//acctPaneValuesCounter = acctPaneValuesCounter + 1;
+					//acctPane.setValueAt(acctPaneTitles.get(1), 1, 0);
+					//acctPane.setValueAt(acctPaneValues[1], 1, 1);
+					acctPane.setValueAt(key, 1, 0);
+					acctPane.setValueAt(value, 1, 1);
+					//System.out.println(key + " " + value + " " + keyCounter + sdf.format(cal.getTime()));
+				}
+				if (key.equals("Leverage-S")){
+				//if (keyCounter == 65){
+					//acctPaneTitles.add(key);
+					//acctPaneValues[acctPaneValuesCounter] = Double.parseDouble(value);
+					//acctPaneValuesCounter = acctPaneValuesCounter + 1;
+					//acctPane.setValueAt(acctPaneTitles.get(2), 2, 0);
+					//acctPane.setValueAt(acctPaneValues[2], 2, 1);
+					acctPane.setValueAt(key, 2, 0);
+					acctPane.setValueAt(value, 2, 1);
+					//System.out.println(key + " " + value + " " + keyCounter + sdf.format(cal.getTime()));
+				}
+				//if (keyCounter == 79){
+				if (key.equals("MaintMarginReq")){
+					//acctPaneTitles.add(key);
+					//acctPaneValues[acctPaneValuesCounter] = Double.parseDouble(value);
+					//acctPaneValuesCounter = acctPaneValuesCounter + 1;
+					//acctPane.setValueAt(acctPaneTitles.get(3), 3, 0);
+					//acctPane.setValueAt(acctPaneValues[3], 3, 1);
+					acctPane.setValueAt(key, 3, 0);
+					acctPane.setValueAt(value, 3, 1);
+					//System.out.println(key + " " + value + " " + keyCounter + sdf.format(cal.getTime()));
+				}
+				//if (keyCounter == 106){
+				if (key.equals("RealizedPnL")){
+					//acctPaneTitles.add(key);
+					//acctPaneValues[acctPaneValuesCounter] = Double.parseDouble(value);
+					//acctPaneValuesCounter = acctPaneValuesCounter + 1;
+					//acctPane.setValueAt(acctPaneTitles.get(4), 4, 0);
+					//acctPane.setValueAt(acctPaneValues[4], 4, 1);
+					acctPane.setValueAt(key, 4, 0);
+					acctPane.setValueAt(value, 4, 1);
+					//System.out.println(key + " " + value + " " + keyCounter + sdf.format(cal.getTime()));
+				}
+				//if (keyCounter == 92){
+				if (key.equals("NetLiquidationByCurrency")){
+					//acctPaneTitles.add(key);
+					//accountCounter = accountCounter + 1;
+					//acctPaneValues[acctPaneValuesCounter] = Double.parseDouble(value);
+					//acctPaneValuesCounter = acctPaneValuesCounter + 1;
+					//acctPane.setValueAt(acctPaneTitles.get(5), 5, 0);
+					//acctPane.setValueAt(acctPaneValues[5], 5, 1);
+					acctPane.setValueAt(key, 5, 0);
+					acctPane.setValueAt(value, 5, 1);
+					//System.out.println(key + " " + value + " " + keyCounter + sdf.format(cal.getTime()));
+				}
+				accountKeyCounter = accountKeyCounter + 1;
 		
 	}
 
@@ -1143,7 +1335,7 @@ public class FrontPanel extends JFrame implements EWrapper {
 		}
 		
 		if (index == -1) {
-			System.out.println("Something went wrong on line 1112" + conID);
+			System.out.println("Something went wrong on line 1112 " + conID);
 		}
 		
 		return index;

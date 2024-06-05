@@ -20,11 +20,16 @@ import java.util.Scanner;
 import java.util.Map.Entry;
 import java.util.Set;
 
+import javax.swing.BorderFactory;
+import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JFrame;
+import javax.swing.JLabel;
 import javax.swing.JPanel;
+import javax.swing.JScrollPane;
 import javax.swing.JTabbedPane;
 import javax.swing.JTable;
+import javax.swing.table.DefaultTableModel;
 
 import com.ib.client.Bar;
 import com.ib.client.CommissionReport;
@@ -56,6 +61,7 @@ import com.ib.client.SoftDollarTier;
 import com.ib.client.TickAttrib;
 import com.ib.client.TickAttribBidAsk;
 import com.ib.client.TickAttribLast;
+import com.ib.client.Util;
 
 import OptionsRecorder.Security;
 import OptionsRecorder.IBTextPanel;
@@ -68,7 +74,7 @@ public class FrontPanel extends JFrame implements EWrapper {
 	private IBTextPanel m_messages = new IBTextPanel("Messages", false);
 	private Order m_order = new Order();
 	public Contract m_contract = new Contract();
-	ExecutionFilter new_filter;
+	ExecutionFilter new_filter = new ExecutionFilter();
 	
 	String account_number;
 	
@@ -92,15 +98,26 @@ public class FrontPanel extends JFrame implements EWrapper {
 	Dictionary<Integer, Integer> underlying_option_dict = new Hashtable<>();
 	Dictionary<Integer, String> put_call_dict = new Hashtable<>();
 	
-	int window = 20;
+	int window = 100;
 	int accountKeyCounter = 0;
+	int orderCounter = 0;
+	int transCounter = 0;
 	int portfolioRowNumber = 0;
+	int portPaneNumColumns = 10;
+	int portPaneNumRows = 15;
+    int orderPaneNumColumns = 7;
+    int orderPaneNumRows = 20;
+    int transPaneNumRows = 20;
+    int transPaneNumColumns = 8;
 	
 	int num_securities = 0;
 	
-	JPanel buttonPanel, messagePanel, mainPanel;
-	JTable acctPane;
+	JFrame mainFrame;
+	JTabbedPane tabbedPane;
+	JPanel buttonPanel, messagePanel, mainPanel, tabbedPanel[];
+	JTable acctPane, portPane, orderPane, transPane, optionsTable[];
 	int port_number;
+	JScrollPane optionsScroll[], portPaneScroll, transPaneScroll, orderPaneScroll;
 	
 	private boolean m_disconnectInProgress = false;
 	
@@ -112,7 +129,10 @@ public class FrontPanel extends JFrame implements EWrapper {
 		
 		get_account_info();
 		create_futures();
-		create_panel();
+		create_main_panel();
+		create_tabbed_panel();
+		create_frame();
+
 		
 	}
 	
@@ -171,14 +191,18 @@ public class FrontPanel extends JFrame implements EWrapper {
 		ArrayList<String> exchange = new ArrayList<String>();
 		ArrayList<String> security_type = new ArrayList<String>();
 		ArrayList<Integer> multiplier = new ArrayList<Integer>();
+		ArrayList<String> stock = new ArrayList<String>();
+		ArrayList<String> stock_exchange = new ArrayList<String>();
 		
 		Scanner input = new Scanner(new File("AccountData.txt"));
-		
+		input.nextLine();
 		while (input.hasNext()) {
 			ticker.add(input.next());
 			exchange.add(input.next());
 			security_type.add(input.next());
-			multiplier.add(input.nextInt());	
+			multiplier.add(input.nextInt());
+			stock.add(input.next());
+			stock_exchange.add(input.next());			
 			num_securities++;
 		}
 		input.close();
@@ -191,34 +215,83 @@ public class FrontPanel extends JFrame implements EWrapper {
 			Security_data[i].exchange = exchange.get(i);
 			Security_data[i].security_type = security_type.get(i);
 			Security_data[i].multiplier = multiplier.get(i);
+			Security_data[i].stock_ticker = stock.get(i);
+			Security_data[i].stock_exchange = stock_exchange.get(i);
 		}
 	}
 	
-	public void create_panel() {
+	public void create_tabbed_panel() {
+		
+		// Creates the ticker specific tabs and adds them to the tabbed pane
+		
+		tabbedPane = new JTabbedPane();
+		tabbedPane.setBounds(0,0,1800,900);
+		tabbedPanel = new JPanel[num_securities];
+		optionsTable = new JTable[num_securities];
+		optionsScroll = new JScrollPane[num_securities];
+		String temp_ticker = "";
+
+		String titles[] = {"Bid","Call","Delta","Strike","Bid","Call","Delta"};
+		
+		tabbedPane.addTab("Main",mainPanel);
+		
+		// Creates a JPanel for each ticker
+		for (int i = 0; i < num_securities; i++) {
+			temp_ticker = Security_data[i].ticker;
+			tabbedPanel[i] = new JPanel();
+			DefaultTableModel table_model=new DefaultTableModel(titles,window);
+			optionsTable[i] = new JTable(table_model);
+			optionsScroll[i] = new JScrollPane(optionsTable[i]);
+			optionsScroll[i].setColumnHeaderView(optionsTable[i].getTableHeader());
+			optionsScroll[i].setBounds(10,150,1770,650);
+			tabbedPanel[i].setLayout(null);
+			tabbedPanel[i].setBounds(0,0,1800,900);
+			tabbedPanel[i].add(optionsScroll[i]);
+			tabbedPane.addTab(temp_ticker, tabbedPanel[i]);
+		}
+	}
+	
+	public void create_main_panel() {
 		// Create the front panel
-		JFrame frame = new JFrame();
-		JPanel mainPanel = new JPanel();
+
+		mainPanel = new JPanel();
 		String title = "Main_tab";
-		frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-		frame.setTitle("Options Recorder");
-		frame.getContentPane().setLayout(null);
-		frame.setSize(1800,900);
+		mainPanel.setLayout(null);
+		mainPanel.setBounds(0,0,1800,900);
 		
 		createButtonPanel();
 		createAccountPanel();
+		createPortfolioPanel();
+		createOrderPanel();
+		createTransPanel();
 		createMessagePanel();
 		
 		buttonPanel.setBounds(0, 0, 120, 700);
 		acctPane.setBounds(130,10,250,200);
-		//mainPanel.setBounds(130, 0, 1750, 900);
+		portPaneScroll.setBounds(130,325,700,400);
+		orderPaneScroll.setBounds(850,325,500,400);
+		transPaneScroll.setBounds(400,10,500,300);
 		
-		messagePanel.setBounds(400, 10, 500, 300);
+		
+		messagePanel.setBounds(925, 10, 500, 300);
 		//mainPanel.add(messagePanel);
-		frame.add(buttonPanel);
-		frame.add(acctPane);
-		frame.add(messagePanel);
-		frame.setVisible(true);
+		mainPanel.add(buttonPanel);
+		mainPanel.add(acctPane);
+		mainPanel.add(portPaneScroll);
+		mainPanel.add(orderPaneScroll);
+		mainPanel.add(transPaneScroll);
+		mainPanel.add(messagePanel);		
+	}
+	
+	public void create_frame() {
+		mainFrame = new JFrame();
+		mainFrame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+		mainFrame.setTitle("Options Recorder");
+		mainFrame.getContentPane().setLayout(null);
+		mainFrame.setSize(1800,900);
 		
+		mainFrame.add(tabbedPane);
+		mainFrame.setVisible(true);
 	}
 	
 	public void createButtonPanel() {
@@ -251,6 +324,24 @@ public class FrontPanel extends JFrame implements EWrapper {
 		RefreshButton.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
 				onRefreshButton();
+			}
+		});
+		
+		JButton OrdersButton = new JButton();
+		OrdersButton.setText("Orders");
+		buttonPanel.add(OrdersButton);
+		OrdersButton.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				onGetOrdersButton();
+			}
+		});
+		
+		JButton TransButton = new JButton();
+		TransButton.setText("Transactions");
+		buttonPanel.add(TransButton);
+		TransButton.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				onTransButton();
 			}
 		});
 		
@@ -332,8 +423,91 @@ public class FrontPanel extends JFrame implements EWrapper {
 		}
 }
 	
+private void createPortfolioPanel(){
+	// Creates the portfolio panel.
+		
+	String titles[] = {"Ticker",
+			"Call/Put",
+			"Strike",
+			"Expiration",
+			"Postion",
+			"Market Price",
+			"Market Value",
+			"Average Cost",
+			"Unrealized P/L",
+			"Realized P/L"};
+	
+		// portPane = new JTable(portPaneNumRows, portPaneNumColumns);
+	DefaultTableModel table_model = new DefaultTableModel(titles,portPaneNumRows);
+	portPane = new JTable(table_model);
+	portPaneScroll = new JScrollPane(portPane);
+		/*for (int i = 0; i< portPaneNumColumns; i++){
+			portPane.getColumnModel().getColumn(i).setPreferredWidth(120);
+		}
+		//portPane.setFont(new Font("Arial", Font.BOLD, 12));
+		portPane.setValueAt("Ticker", 0, 0);
+		portPane.setValueAt("Call/Put", 0, 1);
+		portPane.setValueAt("Strike", 0, 2);
+		portPane.setValueAt("Expiration", 0, 3);
+		portPane.setValueAt("Postion", 0, 4);
+		portPane.setValueAt("Market Price", 0, 5);
+		portPane.setValueAt("Market Value", 0, 6);
+		portPane.setValueAt("Average Cost", 0, 7);
+		portPane.setValueAt("Unrealized P/L", 0, 8);
+		portPane.setValueAt("Realized P/L", 0, 9);*/
+	}
+
+private void createOrderPanel(){
+	
+	String titles[] = {"Contract",
+			"Expiration",
+			"Qnty",
+			"Order Type",
+			"Price",
+			"Limit Price",
+			"Aux Price"};
+	
+	DefaultTableModel table_model=new DefaultTableModel(titles,orderPaneNumRows);
+	orderPane = new JTable(table_model);
+	orderPaneScroll = new JScrollPane(orderPane);
+	/*
+	orderPane.setValueAt("Contract", 0, 0);
+	orderPane.setValueAt("Expiration", 0, 1);
+	orderPane.setValueAt("Qnty", 0, 2);
+	orderPane.setValueAt("Order Type", 0, 3);
+	orderPane.setValueAt("Price", 0, 4);
+	orderPane.setValueAt("Limit Price", 0, 5);
+	orderPane.setValueAt("Aux Price", 0, 6);*/	
+}
+
+private void createTransPanel(){
+	
+	String titles[] = {"Contract",
+			"Sold/Bought",
+			"Call/Put",
+			"Strike",
+			"Expiration",
+			"Qnty",
+			"Price",
+			"Time/Date"};
+	
+	DefaultTableModel table_model = new DefaultTableModel(titles,transPaneNumRows);
+	transPane = new JTable(table_model);
+	transPaneScroll = new JScrollPane(transPane);
+	
+	// transPane = new JTable(transPaneNumRows, transPaneNumColumns);
+	/*transPane.setValueAt("Contract", 0, 0);
+	transPane.setValueAt("Sold/Bought", 0, 1);
+	transPane.setValueAt("Call/Put", 0, 2);
+	transPane.setValueAt("Strike", 0, 3);
+	transPane.setValueAt("Expiration", 0, 4);
+	transPane.setValueAt("Qnty", 0, 5);
+	transPane.setValueAt("Price", 0, 6);	
+	transPane.setValueAt("Time/Date", 0, 7);*/
+}
+	
 	private void onPrint() throws IOException {
-		// WRites the data to seperate output files that have the data
+		// WRites the data to separate output files that have the data
 		
 		String file_name = "";
 		
@@ -347,23 +521,27 @@ public class FrontPanel extends JFrame implements EWrapper {
 			
 			for (int j = 0; j < 2; j++) {
 				for (int k = 0; k < window; k++) {
-					for (int l=0;l<23*60;l++) {
+					for (int l = 0; l <= 6.5 * 60; l++) {
 						if (j == 0) {
 							bw.write(
 									Security_data[i].ticker + " " +
-							"PUT " + Security_data[i].requested_strikes[k] + " Time index = " + l + " data = " +
+							"PUT " + (int)Security_data[i].requested_strikes[k] + " Time index = " + l + " data = " +
 							Security_data[i].data[j][k][l][0] + " " + Security_data[i].data[j][k][l][1] + " " +
 							Security_data[i].data[j][k][l][2] + " " + Security_data[i].data[j][k][l][3] + " " +
-							Security_data[i].data[j][k][l][4] + " " + Security_data[i].data[j][k][l][5]);
+							Security_data[i].data[j][k][l][4] + " " + Security_data[i].data[j][k][l][5] + " " +
+							Security_data[i].data[j][k][l][6] + " " + Security_data[i].data[j][k][l][7] + " " +
+							Security_data[i].data[j][k][l][8] + " " + Security_data[i].data[j][k][l][9]);
 							bw.newLine();
 						}
 						else {
 							bw.write(
 									Security_data[i].ticker + " " +
-							"Call " + Security_data[i].requested_strikes[k] + " Time index = " + l + " data = " +
+							"CALL " + (int)Security_data[i].requested_strikes[k] + " Time index = " + l + " data = " +
 							Security_data[i].data[j][k][l][0] + " " + Security_data[i].data[j][k][l][1] + " " +
 							Security_data[i].data[j][k][l][2] + " " + Security_data[i].data[j][k][l][3] + " " +
-							Security_data[i].data[j][k][l][4] + " " + Security_data[i].data[j][k][l][5]);
+							Security_data[i].data[j][k][l][4] + " " + Security_data[i].data[j][k][l][5] + " " +
+							Security_data[i].data[j][k][l][6] + " " + Security_data[i].data[j][k][l][7] + " " +
+							Security_data[i].data[j][k][l][8] + " " + Security_data[i].data[j][k][l][9]);
 							bw.newLine();							
 						}
 					}
@@ -466,6 +644,33 @@ public class FrontPanel extends JFrame implements EWrapper {
         while (t1-t0<1000);
 				
 		m_client.reqAccountUpdates( false, account_number);		
+	}
+	
+	protected void onGetOrdersButton(){
+		orderCounter = 1;
+		orderPane.setValueAt("Contract", 0, 0);
+		orderPane.setValueAt("Expiration", 0, 1);
+		orderPane.setValueAt("Qnty", 0, 2);
+		orderPane.setValueAt("Order Type", 0, 3);
+		orderPane.setValueAt("Price", 0, 4);
+		orderPane.setValueAt("Limit Price", 0, 5);
+		orderPane.setValueAt("Aux Price", 0, 6);
+		for (int ii = 1; ii<orderPaneNumRows;ii++){
+			for (int jj = 0; jj<orderPaneNumColumns; jj++){
+				orderPane.setValueAt("", ii, jj);
+			}
+		}
+		m_client.reqAllOpenOrders();
+	}
+	
+	protected void onTransButton(){
+		transCounter = 1;
+		for (int ii = 1; ii<transPaneNumRows;ii++){
+			for (int jj = 0; jj<transPaneNumColumns; jj++){
+				transPane.setValueAt("", ii, jj);
+			}
+		}
+		m_client.reqExecutions(1, new_filter);
 	}
 	
 	void onDisconnect() {
@@ -576,7 +781,7 @@ public class FrontPanel extends JFrame implements EWrapper {
 			Security_data[i].requested_strikes = new double[window];
 			Security_data[i].process_strikes(window);
 			//Security_data[i].data = new double [2][window][390][6];
-			Security_data[i].data = new double [2][window][23*60][6];
+			Security_data[i].data = new double [2][window][23*60][10];
 			Security_data[i].initialize_data();
 		}
 		
@@ -628,23 +833,29 @@ public class FrontPanel extends JFrame implements EWrapper {
 	public void tickPrice(int tickerId, int field, double price, TickAttrib attrib) {
 		// TODO Auto-generated method stub
 
-		if (field == 4) {
+		if (field == 1) {
 			if (underlying_option_dict.get(tickerId) == 1) {
 				Security_data[index_dict.get(tickerId)].current_price = price;
 				System.out.println(Security_data[index_dict.get(tickerId)].ticker +
 						" " + " Underlying Price = " + price);
 			}
 			else {
-				Calendar currentDate = Calendar.getInstance(Locale.ENGLISH); //Get the current date
-				int hourOfDay = currentDate.get(Calendar.HOUR_OF_DAY);
-				int minOfHour = currentDate.get(Calendar.MINUTE);
+				
 				System.out.println(Security_data[index_dict.get(tickerId)].ticker +
 						"" + put_call_dict.get(tickerId) + 
-						" " + " Strike = " + " " + strike_dict.get(tickerId) + " Bid = " + price + " "
-						+ hourOfDay + " " + minOfHour);
+						" " + " Strike = " + " " + strike_dict.get(tickerId) + " Bid = " + price);
+				
 				Security_data[index_dict.get(tickerId)].process_price_data(
-						put_call_dict.get(tickerId), hourOfDay, minOfHour, strike_to_window_dict.get(tickerId), price);
+						put_call_dict.get(tickerId),
+						strike_to_window_dict.get(tickerId),
+						price, 0);
 			}
+		}
+		else if (field == 2) {
+			Security_data[index_dict.get(tickerId)].process_price_data(
+					put_call_dict.get(tickerId),
+					strike_to_window_dict.get(tickerId),
+					price, 1);
 		}
 	}
 
@@ -659,14 +870,11 @@ public class FrontPanel extends JFrame implements EWrapper {
 			double optPrice, double pvDividend, double gamma, double vega, double theta, double undPrice) {
 		// TODO Auto-generated method stub
 		if (field == 13) {
-			Calendar currentDate = Calendar.getInstance(Locale.ENGLISH); //Get the current date
-			int hourOfDay = currentDate.get(Calendar.HOUR_OF_DAY);
-			int minOfHour = currentDate.get(Calendar.MINUTE);
+			/*
 			System.out.println(Security_data[index_dict.get(tickerId)].ticker + " Option Price = " + optPrice + " " + " Delta " + " " + delta + 
 					" underlying price = " + undPrice);
+			*/
 			Security_data[index_dict.get(tickerId)].process_delta_data(put_call_dict.get(tickerId),
-					hourOfDay,
-					minOfHour,
 					strike_to_window_dict.get(tickerId),
 					delta,
 					undPrice);
@@ -704,7 +912,16 @@ public class FrontPanel extends JFrame implements EWrapper {
 
 	@Override
 	public void openOrder(int orderId, Contract contract, Order order, OrderState orderState) {
-		// TODO Auto-generated method stub
+		// Fills in the order pane
+		
+		orderPane.setValueAt(contract.symbol(), orderCounter, 0);
+		orderPane.setValueAt(contract.lastTradeDateOrContractMonth(), orderCounter, 1);
+		orderPane.setValueAt(order.totalQuantity(), orderCounter, 2);
+		orderPane.setValueAt(order.action(), orderCounter, 3);
+		orderPane.setValueAt(order.orderType(), orderCounter, 4);
+		orderPane.setValueAt(order.lmtPrice(), orderCounter, 5);
+		orderPane.setValueAt(order.auxPrice(), orderCounter, 6);
+		orderCounter = orderCounter + 1;
 		
 	}
 
@@ -791,8 +1008,32 @@ public class FrontPanel extends JFrame implements EWrapper {
 	@Override
 	public void updatePortfolio(Contract contract, Decimal position, double marketPrice, double marketValue,
 			double averageCost, double unrealizedPNL, double realizedPNL, String accountName) {
-		// TODO Auto-generated method stub
+		// Fills in the Portfolio table
 		
+		portPane.setValueAt(contract.symbol(), portfolioRowNumber, 0);
+		portPane.setValueAt(contract.right(), portfolioRowNumber, 1);
+		portPane.setValueAt(contract.strike(), portfolioRowNumber, 2);
+		portPane.setValueAt(contract.lastTradeDateOrContractMonth(), portfolioRowNumber, 3);
+		portPane.setValueAt(position, portfolioRowNumber, 4);
+		portPane.setValueAt(marketPrice, portfolioRowNumber, 5);
+		portPane.setValueAt(marketValue, portfolioRowNumber, 6);
+		portPane.setValueAt(averageCost, portfolioRowNumber, 7);
+		portPane.setValueAt(unrealizedPNL, portfolioRowNumber, 8);
+		portPane.setValueAt(realizedPNL, portfolioRowNumber, 9);
+		
+		for (int i = 0; i < num_securities; i++){
+			if (contract.localSymbol().equals(Security_data[i].ticker)){
+				Security_data[i].contracts = Integer.valueOf(Util.decimalToStringNoZero(position));
+			}
+		}
+		
+	
+		portfolioRowNumber++;
+		if (portfolioRowNumber >= portPaneNumRows){
+			portfolioRowNumber = 1;
+		}
+		
+		debugPrint(844);
 	}
 
 	@Override
@@ -848,7 +1089,20 @@ public class FrontPanel extends JFrame implements EWrapper {
 
 	@Override
 	public void execDetails(int reqId, Contract contract, Execution execution) {
-		// TODO Auto-generated method stub
+		// FIlls out the transaction panel
+		
+		transPane.setValueAt(contract.symbol(), transCounter, 0);
+		transPane.setValueAt(execution.side(), transCounter, 1);
+		transPane.setValueAt(contract.right(), transCounter, 2);
+		transPane.setValueAt(contract.strike(), transCounter, 3);
+		transPane.setValueAt(contract.lastTradeDateOrContractMonth(), transCounter, 4);
+		transPane.setValueAt(execution.shares(), transCounter, 5);
+		transPane.setValueAt(execution.avgPrice(), transCounter, 6);
+		transPane.setValueAt(execution.time(), transCounter, 7);
+		transCounter = transCounter + 1;
+		if (transCounter >= transPaneNumRows){
+			transCounter = 1;
+		}
 		
 	}
 
@@ -930,9 +1184,7 @@ public class FrontPanel extends JFrame implements EWrapper {
 	public void currentTime(long time) {
 		// TODO Auto-generated method stub
 		String date = new java.text.SimpleDateFormat("MM/dd/yyyy HH:mm:ss").format(new java.util.Date (time*1000));
-		System.out.println("Time line on 469" + date);
 		current_time = date;
-		
 	}
 
 	@Override
@@ -1344,7 +1596,9 @@ public class FrontPanel extends JFrame implements EWrapper {
 	public void debugPrint(int line) {
 		System.out.println("Debugging on line " + line);
 		for (int i = 0 ; i < num_securities; i++) {
-			System.out.println(Security_data[i].ticker + " " + Security_data[i].conID + " " + Security_data[i].expiration);					
+			System.out.println(Security_data[i].ticker + " " +
+		Security_data[i].conID + " " + Security_data[i].expiration +
+		" " + Security_data[i].contracts);					
 		}
 	}
 

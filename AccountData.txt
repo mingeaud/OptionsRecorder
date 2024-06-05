@@ -1,2 +1,3 @@
-ES	CME	FUT	50
-NQ	CME	FUT	20
+Ticker	Exchange	SecType	Multiplier	StockforTrendData	StockExchange
+ES	CME	FUT	50	SPY	SMART
+NQ	CME	FUT	20	QQQ	SMART

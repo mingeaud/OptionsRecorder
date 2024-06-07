@@ -115,15 +115,23 @@ public class FrontPanel extends JFrame implements EWrapper {
 	JFrame mainFrame;
 	JTabbedPane tabbedPane;
 	JPanel buttonPanel, messagePanel, mainPanel, tabbedPanel[];
-	JTable acctPane, portPane, orderPane, transPane, optionsTable[];
+	JTable acctPane, portPane, orderPane, transPane, optionsTable[], underlyingTable[];
 	int port_number;
-	JScrollPane optionsScroll[], portPaneScroll, transPaneScroll, orderPaneScroll;
+	JScrollPane optionsScroll[], portPaneScroll, transPaneScroll, orderPaneScroll, underlyingScroll[];
 	
 	private boolean m_disconnectInProgress = false;
 	
 	int nextID;
 	
 	String todays_date = formatDate();
+	
+	// These are declared here to save time initializing them here instead of in the return option computation
+	int tickTickerID = 0;
+	String tick_put_call = "CALL";
+	int tick_strike_to_window = 0;
+	int greekTickerID = 0;
+	String greek_put_call = "CALL";
+	int greek_strike_to_window = 0;
 	
 	FrontPanel() throws FileNotFoundException {
 		
@@ -229,9 +237,12 @@ public class FrontPanel extends JFrame implements EWrapper {
 		tabbedPanel = new JPanel[num_securities];
 		optionsTable = new JTable[num_securities];
 		optionsScroll = new JScrollPane[num_securities];
+		underlyingTable = new JTable[num_securities];
+		underlyingScroll = new JScrollPane[num_securities]; 
 		String temp_ticker = "";
 
 		String titles[] = {"Bid","Call","Delta","Strike","Bid","Call","Delta"};
+		String undertitles[] = {"Ticker","Current Price"};
 		
 		tabbedPane.addTab("Main",mainPanel);
 		
@@ -244,10 +255,20 @@ public class FrontPanel extends JFrame implements EWrapper {
 			optionsScroll[i] = new JScrollPane(optionsTable[i]);
 			optionsScroll[i].setColumnHeaderView(optionsTable[i].getTableHeader());
 			optionsScroll[i].setBounds(10,150,1770,650);
+			
+			DefaultTableModel table_model1 = new DefaultTableModel(undertitles,1);
+			underlyingTable[i] = new JTable(table_model1);
+			underlyingScroll[i] = new JScrollPane(underlyingTable[i]);
+			underlyingScroll[i].setColumnHeaderView(underlyingTable[i].getTableHeader());
+			underlyingScroll[i].setBounds(10,10,1770,130);
+			
 			tabbedPanel[i].setLayout(null);
 			tabbedPanel[i].setBounds(0,0,1800,900);
 			tabbedPanel[i].add(optionsScroll[i]);
+			tabbedPanel[i].add(underlyingScroll[i]);
 			tabbedPane.addTab(temp_ticker, tabbedPanel[i]);
+			
+			underlyingTable[i].setValueAt(Security_data[i].ticker, 0, 0);
 		}
 	}
 	
@@ -777,12 +798,15 @@ private void createTransPanel(){
 			}
 		}
 		
-		for (int i=0;i<num_securities;i++) {
+		for (int i=0; i < num_securities; i++) {
 			Security_data[i].requested_strikes = new double[window];
 			Security_data[i].process_strikes(window);
 			//Security_data[i].data = new double [2][window][390][6];
-			Security_data[i].data = new double [2][window][23*60][10];
+			Security_data[i].data = new double [2][window][390+1][10];
 			Security_data[i].initialize_data();
+			for (int j = 0; j < window; j++) {
+				optionsTable[i].setValueAt(Security_data[i].requested_strikes[j], j, 3);
+			}
 		}
 		
 		m_messages.add("Complete requesting Option Chains");
@@ -832,30 +856,48 @@ private void createTransPanel(){
 	@Override
 	public void tickPrice(int tickerId, int field, double price, TickAttrib attrib) {
 		// TODO Auto-generated method stub
+		
+		tickTickerID = index_dict.get(tickerId);
 
 		if (field == 1) {
 			if (underlying_option_dict.get(tickerId) == 1) {
-				Security_data[index_dict.get(tickerId)].current_price = price;
-				System.out.println(Security_data[index_dict.get(tickerId)].ticker +
+				Security_data[tickTickerID].current_price = price;
+				System.out.println(Security_data[tickTickerID].ticker +
 						" " + " Underlying Price = " + price);
 			}
 			else {
-				
-				System.out.println(Security_data[index_dict.get(tickerId)].ticker +
+				tick_put_call = put_call_dict.get(tickerId);
+				tick_strike_to_window = strike_to_window_dict.get(tickerId);
+				/*System.out.println(Security_data[tickTickerID].ticker +
 						"" + put_call_dict.get(tickerId) + 
-						" " + " Strike = " + " " + strike_dict.get(tickerId) + " Bid = " + price);
+						" " + " Strike = " + " " + strike_dict.get(tickerId) + " Bid = " + price + " " + tick_put_call);*/
 				
-				Security_data[index_dict.get(tickerId)].process_price_data(
-						put_call_dict.get(tickerId),
-						strike_to_window_dict.get(tickerId),
+				Security_data[tickTickerID].process_price_data(
+						tick_put_call,
+						tick_strike_to_window,
 						price, 0);
+				
+				if (tick_put_call == "CALL") {
+					optionsTable[index_dict.get(tickerId)].setValueAt(price, tick_strike_to_window, 0);
+				}
+				else {
+					optionsTable[index_dict.get(tickerId)].setValueAt(price, tick_strike_to_window, 4);
+				}
 			}
 		}
 		else if (field == 2) {
-			Security_data[index_dict.get(tickerId)].process_price_data(
-					put_call_dict.get(tickerId),
-					strike_to_window_dict.get(tickerId),
+			tick_put_call = put_call_dict.get(tickerId);
+			tick_strike_to_window = strike_to_window_dict.get(tickerId);
+			Security_data[tickTickerID].process_price_data(
+					tick_put_call,
+					tick_strike_to_window,
 					price, 1);
+			if (tick_put_call == "CALL") {
+				optionsTable[index_dict.get(tickerId)].setValueAt(price, tick_strike_to_window, 1);
+			}
+			else {
+				optionsTable[index_dict.get(tickerId)].setValueAt(price, tick_strike_to_window, 5);
+			}
 		}
 	}
 
@@ -874,10 +916,21 @@ private void createTransPanel(){
 			System.out.println(Security_data[index_dict.get(tickerId)].ticker + " Option Price = " + optPrice + " " + " Delta " + " " + delta + 
 					" underlying price = " + undPrice);
 			*/
-			Security_data[index_dict.get(tickerId)].process_delta_data(put_call_dict.get(tickerId),
-					strike_to_window_dict.get(tickerId),
+			greekTickerID = index_dict.get(tickerId);
+			greek_put_call = put_call_dict.get(tickerId);
+			greek_strike_to_window = strike_to_window_dict.get(tickerId);
+			Security_data[greekTickerID].process_delta_data(greek_put_call,
+					greek_strike_to_window,
 					delta,
 					undPrice);
+			if (greek_put_call == "CALL") {
+				optionsTable[index_dict.get(tickerId)].setValueAt(delta, greek_strike_to_window, 2);
+			}
+			else {
+				optionsTable[index_dict.get(tickerId)].setValueAt(delta, greek_strike_to_window, 6);
+			}
+			underlyingTable[tickerId].setValueAt(undPrice, 0, 1);
+			
 		}
 		
 		
@@ -1057,7 +1110,6 @@ private void createTransPanel(){
 		msg = temp1 + temp2;
 		m_messages.add(msg);
 		nextID = orderId;
-		System.out.println("Line 366");
 		
 	}
 

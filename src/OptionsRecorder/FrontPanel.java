@@ -19,6 +19,8 @@ import java.util.Map;
 import java.util.Scanner;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.Timer;
+import java.util.TimerTask;
 
 import javax.swing.BorderFactory;
 import javax.swing.ImageIcon;
@@ -75,7 +77,7 @@ public class FrontPanel extends JFrame implements EWrapper {
 	private Order m_order = new Order();
 	public Contract m_contract = new Contract();
 	ExecutionFilter new_filter = new ExecutionFilter();
-	
+	Timer timer = new Timer();
 	String account_number;
 	
 	String current_time;
@@ -140,8 +142,32 @@ public class FrontPanel extends JFrame implements EWrapper {
 		create_main_panel();
 		create_tabbed_panel();
 		create_frame();
-
 		
+	    timer.scheduleAtFixedRate(new RemindTask(), 2*1000, //initial delay
+		  	      5 * 60 * 1000);
+		
+	}
+	
+	class RemindTask extends TimerTask{
+		//This function is to print the Options data, disconnect from IB and close the window
+		
+		public void run(){
+			Calendar currentDate = Calendar.getInstance(Locale.ENGLISH); //Get the current date
+			int hourOfDay = currentDate.get(Calendar.HOUR_OF_DAY);
+			int minOfHour = currentDate.get(Calendar.MINUTE);
+			
+			if (hourOfDay == 13 ){
+				if (minOfHour >= 01 && minOfHour <= 10){
+					onDisconnect();
+					try {
+						onPrint();
+					} catch (IOException e1) {
+						e1.printStackTrace();
+					}
+					System.exit(0);
+				}				
+			}
+		}
 	}
 	
 	private String formatDate() {
@@ -151,7 +177,7 @@ public class FrontPanel extends JFrame implements EWrapper {
 		int hourOfDay = currentDate.get(Calendar.HOUR_OF_DAY);
 		int minOfHour = currentDate.get(Calendar.MINUTE);
 		
-		if (hourOfDay >= 13) {
+		if (hourOfDay >= 14) {
 			currentDate.add(Calendar.DATE, 1);
 		}
 		String year = String.valueOf(currentDate.get(Calendar.YEAR));
@@ -924,12 +950,12 @@ private void createTransPanel(){
 					delta,
 					undPrice);
 			if (greek_put_call == "CALL") {
-				optionsTable[index_dict.get(tickerId)].setValueAt(delta, greek_strike_to_window, 2);
+				optionsTable[greekTickerID].setValueAt(delta, greek_strike_to_window, 2);
 			}
 			else {
-				optionsTable[index_dict.get(tickerId)].setValueAt(delta, greek_strike_to_window, 6);
+				optionsTable[greekTickerID].setValueAt(delta, greek_strike_to_window, 6);
 			}
-			underlyingTable[tickerId].setValueAt(undPrice, 0, 1);
+			underlyingTable[greekTickerID].setValueAt(undPrice, 0, 1);
 			
 		}
 		

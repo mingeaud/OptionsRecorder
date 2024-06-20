@@ -144,12 +144,12 @@ public class Security {
 				}
 				
 				// If this is a high, record it as the high
-				if (price > data[cp_index][(int)strike_index][time_index][1]) {
+				if (price > data[cp_index][(int)strike_index][time_index][5]) {
 					data[cp_index][(int)strike_index][time_index][5] = price;
 				}
 				
 				// If this is the low, record it as the low
-				if (price < data[cp_index][(int)strike_index][time_index][2]) {
+				if (price < data[cp_index][(int)strike_index][time_index][6]) {
 					data[cp_index][(int)strike_index][time_index][6] = price;
 				}
 				

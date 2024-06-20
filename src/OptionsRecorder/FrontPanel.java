@@ -92,8 +92,9 @@ public class FrontPanel extends JFrame implements EWrapper {
 	int min_expiration = 99999999;
 	int temp_conID;
 	
-	Dictionary<Integer, String> ticker_dict= new Hashtable<>();
-	Dictionary<Integer, Double> strike_dict= new Hashtable<>();
+	Dictionary<Integer, String> ticker_dict = new Hashtable<>();
+	Dictionary<Integer, Double> strike_dict = new Hashtable<>();
+	Dictionary<Integer, Integer> conID_dict = new Hashtable<>();
 	Dictionary<Integer, Integer> strike_to_window_dict = new Hashtable<>();
 	Dictionary<Integer, Integer> secDef_dict= new Hashtable<>();
 	Dictionary<Integer, Integer> index_dict= new Hashtable<>();
@@ -670,7 +671,7 @@ private void createTransPanel(){
 
 				
 		// Reset the rows in the account pane and the portfolio pane
-		portfolioRowNumber = 1;
+		portfolioRowNumber = 0;
 		accountKeyCounter = 0;
 		
 		/*
@@ -694,15 +695,16 @@ private void createTransPanel(){
 	}
 	
 	protected void onGetOrdersButton(){
-		orderCounter = 1;
+		orderCounter = 0;
+		/*
 		orderPane.setValueAt("Contract", 0, 0);
 		orderPane.setValueAt("Expiration", 0, 1);
 		orderPane.setValueAt("Qnty", 0, 2);
 		orderPane.setValueAt("Order Type", 0, 3);
 		orderPane.setValueAt("Price", 0, 4);
 		orderPane.setValueAt("Limit Price", 0, 5);
-		orderPane.setValueAt("Aux Price", 0, 6);
-		for (int ii = 1; ii<orderPaneNumRows;ii++){
+		orderPane.setValueAt("Aux Price", 0, 6);*/
+		for (int ii = 0; ii<orderPaneNumRows;ii++){
 			for (int jj = 0; jj<orderPaneNumColumns; jj++){
 				orderPane.setValueAt("", ii, jj);
 			}
@@ -711,8 +713,8 @@ private void createTransPanel(){
 	}
 	
 	protected void onTransButton(){
-		transCounter = 1;
-		for (int ii = 1; ii<transPaneNumRows;ii++){
+		transCounter = 0;
+		for (int ii = 0; ii<transPaneNumRows;ii++){
 			for (int jj = 0; jj<transPaneNumColumns; jj++){
 				transPane.setValueAt("", ii, jj);
 			}
@@ -807,21 +809,26 @@ private void createTransPanel(){
 					Security_data[i].exchange,
 					Security_data[i].security_type,
 					Security_data[i].conID);
+			conID_dict.put(nextID, i);
 			// m_client.reqSecDefOptParams(nextID,"CL","NYMEX","FUT",212921504);
 			//m_client.reqSecDefOptParams(nextID,"ES","CME","FOP",551601561);
 			//m_client.reqSecDefOptParams(nextID,"NQ","CME","FUT",620730920);
-			nextID++;
+			
 			t1 = System.currentTimeMillis();
 			do {
 				t2 = System.currentTimeMillis();
-			} while (t2 - t1 < 1000);
+			} while (t2 - t1 < 2000);
 			Collections.sort(strikes_list);
-			index = findIndexofConID(temp_conID);
+			
+			//index = findIndexofConID(temp_conID);
+			index = conID_dict.get(nextID);
 			int len = strikes_list.size();
 			Security_data[index].strikes = new double[len];
 			for (int j = 0; j < len; j++){
 				Security_data[index].strikes[j] = strikes_list.get(j);
 			}
+			nextID++;
+			debugPrint2(831,i,min_expiration);
 		}
 		
 		for (int i=0; i < num_securities; i++) {
@@ -1416,13 +1423,26 @@ private void createTransPanel(){
 			String tradingClass, String multiplier, Set<String> expirations, Set<Double> strikes) {
 		
 		// TODO Auto-generated method stub
-		temp_conID = underlyingConId;
-		ArrayList<String> list = new ArrayList<String>(expirations);
-		int temp_num = Integer.parseInt(list.get(0));
-		ArrayList<Double> temp_list = new ArrayList<Double>(strikes);
-		if (temp_num < min_expiration) {
+		// temp_conID = underlyingConId;
+		
+		// The expirations Set only has one expiration in it. The strikes only has the strikes that go with the one expiration
+		
+		// This line makes the one number set accessible
+		ArrayList<String> list = new ArrayList<String>(expirations); 
+		
+		// This gets the one expiration out of the list to compare with the next expiration that gets returned in the streaming data
+		int temp_expiration = Integer.parseInt(list.get(0)); 
+		
+		
+		// If the temp_expiration matches today's date, return it in the strikes_list
+		if (temp_expiration == Integer.valueOf(todays_date)) {
+			System.out.println("Got it on line 1437 Date = " + temp_expiration);
+			
+			// This converts the strikes into a list that that can be accessed back in the requesting function
+			ArrayList<Double> temp_list = new ArrayList<Double>(strikes); 
+			
 			strikes_list.clear();
-			min_expiration = temp_num;
+			min_expiration = temp_expiration;
 			strikes_list = temp_list;
 		}
 		//System.out.println("Line 681 " + underlyingConId + " " + min_expiration + " " + strikes_list);
@@ -1677,6 +1697,15 @@ private void createTransPanel(){
 			System.out.println(Security_data[i].ticker + " " +
 		Security_data[i].conID + " " + Security_data[i].expiration +
 		" " + Security_data[i].contracts);					
+		}
+	}
+	
+	public void debugPrint2(int line, int index, int expiration) {
+		int l = Security_data[index].strikes.length;
+		System.out.println("Debugging on line " + line);
+		System.out.println("Expiration date for " + Security_data[index].ticker + " is " + expiration);
+		for (int i = 0; i<l; i++) {
+			System.out.println(Security_data[index].strikes[i]);
 		}
 	}
 

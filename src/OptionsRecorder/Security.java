@@ -40,7 +40,7 @@ public class Security {
 		int put_index = len;
 		int span;
 		int counter = 0;
-		
+
 		for (int i = 1; i < len - 1; i++){
 		    if (strikes[i] >= strikes[i - 1] && strikes[i] <= current_price) {
 		        call = strikes[i];
@@ -54,14 +54,20 @@ public class Security {
 		    }
 		}
 		
+		// If the current price lands right on a strike price this prevents the span window from going past the window limit
+		if (call_index == put_index) {
+			call_index = call_index - 1;
+		}
+		
 		while (window > len) {
 			window = window / 2;
 		}
-				   
+		//System.out.println("debug line 60 " + call_index + " " + put_index + " " + len);
 		span = (window / 2) + 1;
 		for (int i = 0; i < len; i++) {
 		    if (i < call_index + span && i > put_index - span) {
 		    	requested_strikes[counter] = strikes[i];
+		    	//System.out.println("Counter=" + counter);
 		    	counter++;
 		    }
 		

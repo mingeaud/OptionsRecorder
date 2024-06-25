@@ -4,7 +4,7 @@ import java.util.Calendar;
 import java.util.Locale;
 
 public class Security {
-	String ticker, exchange, security_type, stock_ticker, stock_exchange;
+	String ticker, exchange, security_type, stock_ticker, stock_exchange, tradeclass;
 	int multiplier, conID, expiration, contracts;
 	double current_price, strikes[], requested_strikes[], data[][][][];
 	

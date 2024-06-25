@@ -127,6 +127,7 @@ public class FrontPanel extends JFrame implements EWrapper {
 	int nextID;
 	
 	String todays_date = formatDate();
+	int todays_date_int = Integer.valueOf(todays_date);
 	
 	// These are declared here to save time initializing them here instead of in the return option computation
 	int tickTickerID = 0;
@@ -606,7 +607,7 @@ private void createTransPanel(){
 	}
 	
 	void onHistory() {
-		// This is just checking to see if requesting the options hisotyry is a better method
+		// This is just checking to see if requesting the options history is a better method
 		Contract contract = new Contract();
 		contract.symbol("NQ");
 		contract.secType("FOP");
@@ -802,8 +803,10 @@ private void createTransPanel(){
 		
 		int index = 0;
 		long t1, t2;
+
 		for (int i=0; i<num_securities; i++) {
 			min_expiration = 99999999;
+
 			m_client.reqSecDefOptParams(nextID,
 					Security_data[i].ticker,
 					Security_data[i].exchange,
@@ -859,6 +862,8 @@ private void createTransPanel(){
 				contract.lastTradeDateOrContractMonth(todays_date);
 				contract.strike(Security_data[i].requested_strikes[j]);
 				contract.multiplier(String.valueOf(Security_data[i].multiplier));
+				contract.tradingClass(Security_data[i].tradeclass);
+
 				
 				// First Request the PUT
 				contract.right("PUT");
@@ -945,10 +950,10 @@ private void createTransPanel(){
 			double optPrice, double pvDividend, double gamma, double vega, double theta, double undPrice) {
 		// TODO Auto-generated method stub
 		if (field == 13) {
-			/*
-			System.out.println(Security_data[index_dict.get(tickerId)].ticker + " Option Price = " + optPrice + " " + " Delta " + " " + delta + 
-					" underlying price = " + undPrice);
-			*/
+
+			/*System.out.println(Security_data[index_dict.get(tickerId)].ticker + " Option Price = " + optPrice + " " + " Delta " + " " + delta + 
+					" underlying price = " + undPrice);*/
+
 			greekTickerID = index_dict.get(tickerId);
 			greek_put_call = put_call_dict.get(tickerId);
 			greek_strike_to_window = strike_to_window_dict.get(tickerId);
@@ -1152,11 +1157,12 @@ private void createTransPanel(){
 		System.out.println(contractDetails.realExpirationDate());
 		//int index = findIndexofTicker(contractDetails.marketName());
 		int index = secDef_dict.get(reqId);
+		int expiration_date = Integer.valueOf(contractDetails.realExpirationDate());
 		
-		if (Integer.valueOf(contractDetails.realExpirationDate()) < min_expiration) {
-			min_expiration = Integer.valueOf(contractDetails.realExpirationDate());
+		if (expiration_date < min_expiration && expiration_date > todays_date_int) {
+			min_expiration = expiration_date;
 			Security_data[index].conID = contractDetails.conid();
-			Security_data[index].expiration = min_expiration;			
+			Security_data[index].expiration = min_expiration;		
 		}
 	}
 
@@ -1422,29 +1428,27 @@ private void createTransPanel(){
 	public void securityDefinitionOptionalParameter(int reqId, String exchange, int underlyingConId,
 			String tradingClass, String multiplier, Set<String> expirations, Set<Double> strikes) {
 		
-		// TODO Auto-generated method stub
-		// temp_conID = underlyingConId;
+		// Convert the set of Expirations to an array
+		int size_list = expirations.size();
+		String expirations_array[] = new String[size_list];
+		expirations_array = expirations.toArray(expirations_array);
 		
-		// The expirations Set only has one expiration in it. The strikes only has the strikes that go with the one expiration
-		
-		// This line makes the one number set accessible
-		ArrayList<String> list = new ArrayList<String>(expirations); 
-		
-		// This gets the one expiration out of the list to compare with the next expiration that gets returned in the streaming data
-		int temp_expiration = Integer.parseInt(list.get(0)); 
-		
-		
+		// Cycle through the list of expirations and 
 		// If the temp_expiration matches today's date, return it in the strikes_list
-		if (temp_expiration == Integer.valueOf(todays_date)) {
-			System.out.println("Got it on line 1437 Date = " + temp_expiration);
-			
-			// This converts the strikes into a list that that can be accessed back in the requesting function
-			ArrayList<Double> temp_list = new ArrayList<Double>(strikes); 
-			
-			strikes_list.clear();
-			min_expiration = temp_expiration;
-			strikes_list = temp_list;
+		for (int i = 0; i < size_list; i++) {
+			if (expirations_array[i].equals(todays_date)) {
+				System.out.println("Got it on line 1437 Date = " + expirations_array[i]);
+				
+				// This converts the strikes into a list that that can be accessed back in the requesting function
+				ArrayList<Double> temp_list = new ArrayList<Double>(strikes); 
+				
+				strikes_list.clear();
+				min_expiration = Integer.valueOf(expirations_array[i]);
+				strikes_list = temp_list;
+				Security_data[conID_dict.get(reqId)].tradeclass = tradingClass;
+			}
 		}
+
 		//System.out.println("Line 681 " + underlyingConId + " " + min_expiration + " " + strikes_list);
 		//System.out.println("Security Definition Optional Parameter: " + EWrapperMsgGenerator.securityDefinitionOptionalParameter(reqId, exchange, underlyingConId, tradingClass, multiplier, expirations, strikes));
 	}

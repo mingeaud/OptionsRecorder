@@ -114,6 +114,7 @@ public class FrontPanel extends JFrame implements EWrapper {
     int transPaneNumColumns = 8;
 	
 	int num_securities = 0;
+	int connected_to_TWS = 0;
 	
 	JFrame mainFrame;
 	JTabbedPane tabbedPane;
@@ -147,6 +148,8 @@ public class FrontPanel extends JFrame implements EWrapper {
 		
 	    timer.scheduleAtFixedRate(new RemindTask(), 2*1000, //initial delay
 		  	      5 * 60 * 1000);
+	    
+	    // timer.scheduleAtFixedRate(new RemindTask2(), 10*1000, 1440 * 60 * 1000); // 10 second initial delay, the subsequent delay is so long it only runs once
 		
 	}
 	
@@ -170,6 +173,30 @@ public class FrontPanel extends JFrame implements EWrapper {
 				}				
 			}
 		}
+	}
+	
+	class RemindTask2 extends TimerTask{
+		// This task automatically connects and presses all of the buttons needed to do it's job
+
+		public void run() {
+			
+			if (connected_to_TWS == 0) {
+				//onGatewayButton();
+				System.out.println("Trying to connect to Gateway");
+			}
+			else {
+				System.out.println("Already Connected to TWS");
+			}
+			
+			onRefreshButton();
+			onGetOrdersButton();
+			onTransButton();
+			onReqSecDefButton();
+			onUnderlyingPrice();
+			onOptionChainButton();
+			onOptionPriceButton();			
+		}
+		
 	}
 	
 	private String formatDate() {
@@ -633,6 +660,7 @@ private void createTransPanel(){
 		if (m_client.isConnected()) {
 			m_messages.add("Connected to Tws server version " + m_client.serverVersion() + " at "
 					+ m_client.getTwsConnectionTime());
+			connected_to_TWS = 1;
 		}
 		else {
 			m_messages.add("Connection Failed");
@@ -1154,7 +1182,8 @@ private void createTransPanel(){
 	@Override
 	public void contractDetails(int reqId, ContractDetails contractDetails) {
 		// TODO Auto-generated method stub
-		System.out.println(contractDetails.realExpirationDate());
+		System.out.println("Line 1185 " + contractDetails.realExpirationDate());
+		System.out.println("Line 1185 " + contractDetails);
 		//int index = findIndexofTicker(contractDetails.marketName());
 		int index = secDef_dict.get(reqId);
 		int expiration_date = Integer.valueOf(contractDetails.realExpirationDate());

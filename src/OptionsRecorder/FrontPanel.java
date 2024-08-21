@@ -101,7 +101,7 @@ public class FrontPanel extends JFrame implements EWrapper {
 	Dictionary<Integer, Integer> underlying_option_dict = new Hashtable<>();
 	Dictionary<Integer, String> put_call_dict = new Hashtable<>();
 	
-	int window = 100;
+	// int window = 98;
 	int accountKeyCounter = 0;
 	int orderCounter = 0;
 	int transCounter = 0;
@@ -142,6 +142,7 @@ public class FrontPanel extends JFrame implements EWrapper {
 		
 		get_account_info();
 		create_futures();
+		read_recommendation();
 		create_main_panel();
 		create_tabbed_panel();
 		create_frame();
@@ -206,6 +207,9 @@ public class FrontPanel extends JFrame implements EWrapper {
 		int hourOfDay = currentDate.get(Calendar.HOUR_OF_DAY);
 		int minOfHour = currentDate.get(Calendar.MINUTE);
 		
+		if (hourOfDay >= 13 && minOfHour > 30) {
+			currentDate.add(Calendar.DATE, 1);
+		}
 		if (hourOfDay >= 14) {
 			currentDate.add(Calendar.DATE, 1);
 		}
@@ -256,6 +260,9 @@ public class FrontPanel extends JFrame implements EWrapper {
 		ArrayList<Integer> multiplier = new ArrayList<Integer>();
 		ArrayList<String> stock = new ArrayList<String>();
 		ArrayList<String> stock_exchange = new ArrayList<String>();
+		ArrayList<Integer> window = new ArrayList<Integer>();
+		ArrayList<Boolean> record_options = new ArrayList<Boolean>();
+
 		
 		Scanner input = new Scanner(new File("AccountData.txt"));
 		input.nextLine();
@@ -265,7 +272,9 @@ public class FrontPanel extends JFrame implements EWrapper {
 			security_type.add(input.next());
 			multiplier.add(input.nextInt());
 			stock.add(input.next());
-			stock_exchange.add(input.next());			
+			stock_exchange.add(input.next());
+			window.add(input.nextInt());
+			record_options.add(input.nextBoolean());
 			num_securities++;
 		}
 		input.close();
@@ -280,7 +289,29 @@ public class FrontPanel extends JFrame implements EWrapper {
 			Security_data[i].multiplier = multiplier.get(i);
 			Security_data[i].stock_ticker = stock.get(i);
 			Security_data[i].stock_exchange = stock_exchange.get(i);
+			Security_data[i].window = window.get(i);
+			Security_data[i].record_options = record_options.get(i);
 		}
+		
+	}
+	
+	public void read_recommendation() throws FileNotFoundException {
+		
+		String rec_ticker;
+		String rec_recommend;
+		
+		Scanner input = new Scanner(new File("recommendations.txt"));
+		while(input.hasNext()) {
+			rec_ticker = input.next();
+			rec_recommend = input.next();
+			for (int i = 0; i < num_securities; i++) {
+				if (rec_ticker.equals(Security_data[i].stock_ticker)){
+					Security_data[i].recommendation = rec_recommend;
+				}
+			}
+			
+		}
+		input.close();
 	}
 	
 	public void create_tabbed_panel() {
@@ -303,27 +334,29 @@ public class FrontPanel extends JFrame implements EWrapper {
 		
 		// Creates a JPanel for each ticker
 		for (int i = 0; i < num_securities; i++) {
-			temp_ticker = Security_data[i].ticker;
-			tabbedPanel[i] = new JPanel();
-			DefaultTableModel table_model=new DefaultTableModel(titles,window);
-			optionsTable[i] = new JTable(table_model);
-			optionsScroll[i] = new JScrollPane(optionsTable[i]);
-			optionsScroll[i].setColumnHeaderView(optionsTable[i].getTableHeader());
-			optionsScroll[i].setBounds(10,150,1770,650);
-			
-			DefaultTableModel table_model1 = new DefaultTableModel(undertitles,1);
-			underlyingTable[i] = new JTable(table_model1);
-			underlyingScroll[i] = new JScrollPane(underlyingTable[i]);
-			underlyingScroll[i].setColumnHeaderView(underlyingTable[i].getTableHeader());
-			underlyingScroll[i].setBounds(10,10,1770,130);
-			
-			tabbedPanel[i].setLayout(null);
-			tabbedPanel[i].setBounds(0,0,1800,900);
-			tabbedPanel[i].add(optionsScroll[i]);
-			tabbedPanel[i].add(underlyingScroll[i]);
-			tabbedPane.addTab(temp_ticker, tabbedPanel[i]);
-			
-			underlyingTable[i].setValueAt(Security_data[i].ticker, 0, 0);
+			if(Security_data[i].record_options){
+				temp_ticker = Security_data[i].ticker;
+				tabbedPanel[i] = new JPanel();
+				DefaultTableModel table_model=new DefaultTableModel(titles,Security_data[i].window);
+				optionsTable[i] = new JTable(table_model);
+				optionsScroll[i] = new JScrollPane(optionsTable[i]);
+				optionsScroll[i].setColumnHeaderView(optionsTable[i].getTableHeader());
+				optionsScroll[i].setBounds(10,150,1770,650);
+				
+				DefaultTableModel table_model1 = new DefaultTableModel(undertitles,1);
+				underlyingTable[i] = new JTable(table_model1);
+				underlyingScroll[i] = new JScrollPane(underlyingTable[i]);
+				underlyingScroll[i].setColumnHeaderView(underlyingTable[i].getTableHeader());
+				underlyingScroll[i].setBounds(10,10,1770,130);
+				
+				tabbedPanel[i].setLayout(null);
+				tabbedPanel[i].setBounds(0,0,1800,900);
+				tabbedPanel[i].add(optionsScroll[i]);
+				tabbedPanel[i].add(underlyingScroll[i]);
+				tabbedPane.addTab(temp_ticker, tabbedPanel[i]);
+				
+				underlyingTable[i].setValueAt(Security_data[i].ticker, 0, 0);
+			}
 		}
 	}
 	
@@ -596,7 +629,7 @@ private void createTransPanel(){
 			BufferedWriter bw = new BufferedWriter(fw);
 			
 			for (int j = 0; j < 2; j++) {
-				for (int k = 0; k < window; k++) {
+				for (int k = 0; k < Security_data[i].window; k++) {
 					for (int l = 0; l <= 6.5 * 60; l++) {
 						if (j == 0) {
 							bw.write(
@@ -802,13 +835,28 @@ private void createTransPanel(){
 		Contract contract = new Contract();
 		
 		for (int i=0;i<num_securities;i++) {
-			contract.symbol(Security_data[i].ticker);
-			contract.secType("FUT");
-			contract.currency("USD");
-			contract.exchange(Security_data[i].exchange);
-			contract.lastTradeDateOrContractMonth(String.valueOf(Security_data[i].expiration));
-			contract.conid(Security_data[i].conID);
-			contract.multiplier(String.valueOf(Security_data[i].multiplier));
+			if (Security_data[i].ticker.equals("SPX")) {
+				
+				contract.exchange("CBOE");
+				contract.conid(Security_data[i].conID);
+				contract.tradingClass("SPX");
+				contract.currency("USD");
+				contract.multiplier("100");
+				contract.localSymbol("SPX");
+				//Security_data[tickTickerID].current_price = 5520;
+			}
+			else {
+				contract.symbol(Security_data[i].ticker);
+				contract.secType(Security_data[i].security_type);
+				contract.currency("USD");
+				contract.exchange(Security_data[i].exchange);
+				contract.lastTradeDateOrContractMonth(String.valueOf(Security_data[i].expiration));
+				contract.tradingClass(Security_data[i].ticker);
+				contract.conid(Security_data[i].conID);
+				contract.multiplier(String.valueOf(Security_data[i].multiplier));
+				
+			}			
+
 			index_dict.put(nextID, i);
 			underlying_option_dict.put(nextID, 1);
 			m_client.reqMktData(nextID,contract,"",false,false,null);
@@ -816,7 +864,7 @@ private void createTransPanel(){
 			t1 = System.currentTimeMillis();
 			do {
 				t2 = System.currentTimeMillis();
-			} while (t2 - t1 < 1000);
+			} while (t2 - t1 < 2000);
 			m_client.cancelMktData(nextID);
 			nextID++;
 		}
@@ -834,12 +882,20 @@ private void createTransPanel(){
 
 		for (int i=0; i<num_securities; i++) {
 			min_expiration = 99999999;
-
-			m_client.reqSecDefOptParams(nextID,
-					Security_data[i].ticker,
-					Security_data[i].exchange,
-					Security_data[i].security_type,
-					Security_data[i].conID);
+			if (Security_data[i].ticker.equals("SPX") || Security_data[i].ticker.equals("SPY") || Security_data[i].ticker.equals("QQQ")) {
+				m_client.reqSecDefOptParams(nextID,
+						Security_data[i].ticker,
+						"",
+						Security_data[i].security_type,
+						Security_data[i].conID);
+			}
+			else {
+				m_client.reqSecDefOptParams(nextID,
+						Security_data[i].ticker,
+						Security_data[i].exchange,
+						Security_data[i].security_type,
+						Security_data[i].conID);
+			}
 			conID_dict.put(nextID, i);
 			// m_client.reqSecDefOptParams(nextID,"CL","NYMEX","FUT",212921504);
 			//m_client.reqSecDefOptParams(nextID,"ES","CME","FOP",551601561);
@@ -863,12 +919,12 @@ private void createTransPanel(){
 		}
 		
 		for (int i=0; i < num_securities; i++) {
-			Security_data[i].requested_strikes = new double[window];
-			Security_data[i].process_strikes(window);
+			Security_data[i].requested_strikes = new double[Security_data[i].window];
+			Security_data[i].process_strikes();
 			//Security_data[i].data = new double [2][window][390][6];
-			Security_data[i].data = new double [2][window][390+1][10];
+			Security_data[i].data = new double [2][Security_data[i].window][390+1][10];
 			Security_data[i].initialize_data();
-			for (int j = 0; j < window; j++) {
+			for (int j = 0; j < Security_data[i].window; j++) {
 				optionsTable[i].setValueAt(Security_data[i].requested_strikes[j], j, 3);
 			}
 		}
@@ -881,17 +937,43 @@ private void createTransPanel(){
 		// Hopefully this gets the entire option chain streaming through
 		
 		for (int i = 0; i < num_securities; i++) {
-			for (int j = 0; j < window; j++) {
+			if (Security_data[i].record_options) {
+				
+			
+			for (int j = 0; j < Security_data[i].window; j++) {
 				Contract contract = new Contract();
-				contract.symbol(Security_data[i].ticker);
-				contract.secType("FOP");
-				contract.currency("USD");
-				contract.exchange("CME");
-				contract.lastTradeDateOrContractMonth(todays_date);
-				contract.strike(Security_data[i].requested_strikes[j]);
-				contract.multiplier(String.valueOf(Security_data[i].multiplier));
-				contract.tradingClass(Security_data[i].tradeclass);
-
+				if (Security_data[i].ticker.equals("SPX")) {
+					contract.symbol(Security_data[i].ticker);
+					contract.secType("OPT");
+					contract.currency("USD");
+					contract.exchange("CBOE");
+					contract.lastTradeDateOrContractMonth(todays_date);
+					contract.strike(Security_data[i].requested_strikes[j]);
+					contract.multiplier(String.valueOf(Security_data[i].multiplier));
+					contract.tradingClass(Security_data[i].tradeclass);
+				}
+				else if (Security_data[i].ticker.equals("SPY") || Security_data[i].ticker.equals("QQQ")) {
+					contract.symbol(Security_data[i].ticker);
+					contract.secType("OPT");
+					contract.currency("USD");
+					contract.exchange(Security_data[i].exchange);
+					contract.lastTradeDateOrContractMonth(todays_date);
+					contract.strike(Security_data[i].requested_strikes[j]);
+					//contract.multiplier(String.valueOf(Security_data[i].multiplier));
+					//contract.tradingClass(Security_data[i].tradeclass);
+				}
+				else {
+					
+					contract.symbol(Security_data[i].ticker);
+					contract.secType("FOP");
+					contract.currency("USD");
+					contract.exchange("CME");
+					contract.lastTradeDateOrContractMonth(todays_date);
+					contract.strike(Security_data[i].requested_strikes[j]);
+					contract.multiplier(String.valueOf(Security_data[i].multiplier));
+					contract.tradingClass(Security_data[i].tradeclass);
+					
+				}
 				
 				// First Request the PUT
 				contract.right("PUT");
@@ -914,7 +996,7 @@ private void createTransPanel(){
 				nextID++;
 			}
 
-
+			}
 		}
 	}
 	
@@ -924,10 +1006,11 @@ private void createTransPanel(){
 		// TODO Auto-generated method stub
 		
 		tickTickerID = index_dict.get(tickerId);
-
+		//System.out.println("Line 966 " + field + " " + price + " " + attrib);
 		if (field == 1) {
-			if (underlying_option_dict.get(tickerId) == 1) {
+			if (underlying_option_dict.get(tickerId) == 1 && !Security_data[tickTickerID].ticker.equals("SPX")) {
 				Security_data[tickTickerID].current_price = price;
+				System.out.println("don't forget to reset this");
 				System.out.println(Security_data[tickTickerID].ticker +
 						" " + " Underlying Price = " + price);
 			}
@@ -964,6 +1047,17 @@ private void createTransPanel(){
 			else {
 				optionsTable[index_dict.get(tickerId)].setValueAt(price, tick_strike_to_window, 5);
 			}
+		}
+		
+		// A special field to account for SPX not having a bid or ask
+		else if (field == 4) {
+			if (underlying_option_dict.get(tickerId) == 1 && Security_data[tickTickerID].ticker.equals("SPX")) {
+				Security_data[tickTickerID].current_price = price;
+				System.out.println("don't forget to reset this");
+				System.out.println(Security_data[tickTickerID].ticker +
+						" " + " Underlying Price = " + price);
+			}
+			
 		}
 	}
 
@@ -1186,12 +1280,17 @@ private void createTransPanel(){
 		System.out.println("Line 1185 " + contractDetails);
 		//int index = findIndexofTicker(contractDetails.marketName());
 		int index = secDef_dict.get(reqId);
-		int expiration_date = Integer.valueOf(contractDetails.realExpirationDate());
-		
-		if (expiration_date < min_expiration && expiration_date > todays_date_int) {
-			min_expiration = expiration_date;
+		if (Security_data[index].ticker.equals("SPX") || Security_data[index].ticker.equals("SPY") || Security_data[index].ticker.equals("QQQ")){
 			Security_data[index].conID = contractDetails.conid();
-			Security_data[index].expiration = min_expiration;		
+		}
+		else {
+			int expiration_date = Integer.valueOf(contractDetails.realExpirationDate());
+			
+			if (expiration_date < min_expiration && expiration_date > todays_date_int) {
+				min_expiration = expiration_date;
+				Security_data[index].conID = contractDetails.conid();
+				Security_data[index].expiration = min_expiration;	
+		}
 		}
 	}
 
@@ -1457,6 +1556,9 @@ private void createTransPanel(){
 	public void securityDefinitionOptionalParameter(int reqId, String exchange, int underlyingConId,
 			String tradingClass, String multiplier, Set<String> expirations, Set<Double> strikes) {
 		
+		//System.out.println("Line 1470 hit" + expirations);
+		// System.out.println("Line 1471 hit" + strikes);
+		
 		// Convert the set of Expirations to an array
 		int size_list = expirations.size();
 		String expirations_array[] = new String[size_list];
@@ -1467,6 +1569,8 @@ private void createTransPanel(){
 		for (int i = 0; i < size_list; i++) {
 			if (expirations_array[i].equals(todays_date)) {
 				System.out.println("Got it on line 1437 Date = " + expirations_array[i]);
+				System.out.println("Line 1529 debugging - " + expirations);
+				System.out.println("Line 1543 hit" + strikes);
 				
 				// This converts the strikes into a list that that can be accessed back in the requesting function
 				ArrayList<Double> temp_list = new ArrayList<Double>(strikes); 

@@ -1,12 +1,15 @@
 package OptionsRecorder;
 
 import java.util.Calendar;
+import java.util.HashSet;
 import java.util.Locale;
+import java.util.Set;
 
 public class Security {
-	String ticker, exchange, security_type, stock_ticker, stock_exchange, tradeclass;
-	int multiplier, conID, expiration, contracts;
+	String ticker, exchange, security_type, stock_ticker, stock_exchange, tradeclass, recommendation;
+	int multiplier, conID, expiration, contracts, window;
 	double current_price, strikes[], requested_strikes[], data[][][][];
+	boolean record_options;
 	
 	// These are here to try to speed up organizing data to prevent the next price from coming in too fast
 	Calendar currentDate = Calendar.getInstance(Locale.ENGLISH);
@@ -29,7 +32,7 @@ public class Security {
 		}
 	}
 	
-	public void process_strikes(int window) {
+	public void process_strikes() {
 		
 		
 		int len = strikes.length;
@@ -40,7 +43,9 @@ public class Security {
 		int put_index = len;
 		int span;
 		int counter = 0;
-
+		
+		Set<Integer> hs = new HashSet<Integer>();
+		
 		for (int i = 1; i < len - 1; i++){
 		    if (strikes[i] >= strikes[i - 1] && strikes[i] <= current_price) {
 		        call = strikes[i];
@@ -64,9 +69,28 @@ public class Security {
 		}
 		//System.out.println("debug line 60 " + call_index + " " + put_index + " " + len);
 		span = (window / 2) + 1;
+		int good_strike = 0;
 		for (int i = 0; i < len; i++) {
-		    if (i < call_index + span && i > put_index - span) {
+			good_strike = 0;
+			if (strikes[i] == 522.5) { // debugging
+				int fart = 0;
+			}
+	    	if (ticker.equals("SPY") || ticker.equals("QQQ") ) {
+	    		int j = (int)strikes[i];
+	    		if (!hs.contains(j)) {
+	    			good_strike = 1;
+	    			hs.add(j);
+	    		}
+	    	}
+	    	else {
+	    		good_strike = 1;
+	    	}
+		    if (i < call_index + span && i > put_index - span && good_strike == 1) {
+
+
 		    	requested_strikes[counter] = strikes[i];
+
+		    	
 		    	//System.out.println("Counter=" + counter);
 		    	counter++;
 		    }

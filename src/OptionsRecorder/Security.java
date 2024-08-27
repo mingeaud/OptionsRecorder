@@ -9,7 +9,7 @@ public class Security {
 	String ticker, exchange, security_type, stock_ticker, stock_exchange, tradeclass, recommendation;
 	int multiplier, conID, expiration, contracts, window;
 	double current_price, strikes[], requested_strikes[], data[][][][];
-	boolean record_options;
+	boolean record_options, for_trading;
 	
 	// These are here to try to speed up organizing data to prevent the next price from coming in too fast
 	Calendar currentDate = Calendar.getInstance(Locale.ENGLISH);

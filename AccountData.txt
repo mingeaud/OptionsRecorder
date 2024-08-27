@@ -1,4 +1,5 @@
-Ticker	Exchange	SecType	Multiplier	StockforTrendData	StockExchange Window	RecordOptions
-SPY	SMART	STK	1	SPY	SMART	50	true
-QQQ	SMART	STK	1	QQQ	SMART	80	true
-ES	CME	FUT	50	SPY SMART	50	false
+Ticker	Exchange	SecType	Multiplier	StockforTrendData	StockExchange Window	RecordOptions ForTrading
+SPY	SMART	STK	1	SPY	SMART	50	true	false
+QQQ	SMART	STK	1	QQQ	SMART	80	true	false
+ES	CME	FUT	50	SPY SMART	50	false	true
+NQ	CME	FUT	20	QQQ	SMART	80	false	true

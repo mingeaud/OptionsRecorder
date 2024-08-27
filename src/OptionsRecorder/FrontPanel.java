@@ -262,6 +262,7 @@ public class FrontPanel extends JFrame implements EWrapper {
 		ArrayList<String> stock_exchange = new ArrayList<String>();
 		ArrayList<Integer> window = new ArrayList<Integer>();
 		ArrayList<Boolean> record_options = new ArrayList<Boolean>();
+		ArrayList<Boolean> for_trading = new ArrayList<Boolean>();
 
 		
 		Scanner input = new Scanner(new File("AccountData.txt"));
@@ -275,6 +276,7 @@ public class FrontPanel extends JFrame implements EWrapper {
 			stock_exchange.add(input.next());
 			window.add(input.nextInt());
 			record_options.add(input.nextBoolean());
+			for_trading.add(input.nextBoolean());
 			num_securities++;
 		}
 		input.close();
@@ -291,6 +293,7 @@ public class FrontPanel extends JFrame implements EWrapper {
 			Security_data[i].stock_exchange = stock_exchange.get(i);
 			Security_data[i].window = window.get(i);
 			Security_data[i].record_options = record_options.get(i);
+			Security_data[i].for_trading = for_trading.get(i);
 		}
 		
 	}
@@ -621,6 +624,7 @@ private void createTransPanel(){
 		String file_name = "";
 		
 		for (int i = 0; i < num_securities; i++) {
+			if (Security_data[i].record_options) {
 
 			file_name = Security_data[i].ticker + formatDate()+".txt"; 
 			File file = new File(file_name);
@@ -657,6 +661,7 @@ private void createTransPanel(){
 				}
 			}
 			bw.close();
+		}
 		}
 	}
 	
@@ -919,6 +924,9 @@ private void createTransPanel(){
 		}
 		
 		for (int i=0; i < num_securities; i++) {
+			if(Security_data[i].record_options) {
+				
+			
 			Security_data[i].requested_strikes = new double[Security_data[i].window];
 			Security_data[i].process_strikes();
 			//Security_data[i].data = new double [2][window][390][6];
@@ -926,6 +934,7 @@ private void createTransPanel(){
 			Security_data[i].initialize_data();
 			for (int j = 0; j < Security_data[i].window; j++) {
 				optionsTable[i].setValueAt(Security_data[i].requested_strikes[j], j, 3);
+			}
 			}
 		}
 		
@@ -1235,18 +1244,18 @@ private void createTransPanel(){
 		portPane.setValueAt(realizedPNL, portfolioRowNumber, 9);
 		
 		for (int i = 0; i < num_securities; i++){
-			if (contract.localSymbol().equals(Security_data[i].ticker)){
+			if (contract.conid() == Security_data[i].conID){				
 				Security_data[i].contracts = Integer.valueOf(Util.decimalToStringNoZero(position));
 			}
 		}
-		
+		System.out.println(contract);
 	
 		portfolioRowNumber++;
 		if (portfolioRowNumber >= portPaneNumRows){
 			portfolioRowNumber = 1;
 		}
 		
-		debugPrint(844);
+		// debugPrint(844);
 	}
 
 	@Override

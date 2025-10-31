@@ -7,9 +7,9 @@ import java.util.Set;
 
 public class Security {
 	String ticker, exchange, security_type, stock_ticker, stock_exchange, tradeclass, recommendation;
-	int multiplier, conID, expiration, contracts, window;
-	double current_price, strikes[], requested_strikes[], data[][][][];
-	boolean record_options, for_trading;
+	int multiplier, conID, expiration, contracts, window, num_to_trade;
+	double current_price, strikes[], requested_strikes[], data[][][][], underlying[][];
+	boolean record_options, for_trading, already_traded, record_underlying;
 	
 	// These are here to try to speed up organizing data to prevent the next price from coming in too fast
 	Calendar currentDate = Calendar.getInstance(Locale.ENGLISH);
@@ -28,6 +28,16 @@ public class Security {
 						data[i][j][k][l] = 0;											
 					}
 				}
+			}
+		}
+	}
+	
+	public void initialize_underlying() {
+		int l_5 = underlying.length;
+		int l_6 = underlying[0].length;
+		for (int i = 0; i < l_5; i++) {
+			for (int j = 0; j < l_6; j++) {
+				underlying[i][j] = 0;				
 			}
 		}
 	}
@@ -121,6 +131,39 @@ public class Security {
 		}
 		
 		return cp_index;
+	}
+	
+	public void process_underlying_price_data(double price) {
+		currentDate = Calendar.getInstance(Locale.ENGLISH); //Get the current date
+		hour = currentDate.get(Calendar.HOUR_OF_DAY);
+		minute = currentDate.get(Calendar.MINUTE);
+		
+		// Find the indices for the time and call or put with these functions
+		int time_index = process_index(hour, minute);
+		
+		// If the time is between the trading hours, record it
+		if (time_index >=0 && time_index <= 6.5*60) {
+			if (underlying[time_index][0] == 0) {
+				underlying[time_index][0] = price;
+				underlying[time_index][1] = price;
+				underlying[time_index][2] = price;
+				underlying[time_index][3] = price;
+			}
+			
+			// If this is a high, record it as the high
+			if (price > underlying[time_index][1]) {
+				underlying[time_index][1] = price;
+			}
+			
+			// If this is the low, record it as the low
+			if (price < underlying[time_index][2]) {
+				underlying[time_index][2] = price;
+			}
+			
+			// Always use the latest price as the close
+			underlying[time_index][3] = price;
+			
+		}
 	}
 	
 	

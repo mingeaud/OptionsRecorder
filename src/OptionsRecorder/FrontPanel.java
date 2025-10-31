@@ -1,6 +1,7 @@
 package OptionsRecorder;
 
 import java.awt.GridLayout;
+import java.time.LocalTime;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.BufferedWriter;
@@ -98,7 +99,7 @@ public class FrontPanel extends JFrame implements EWrapper {
 	Dictionary<Integer, Integer> strike_to_window_dict = new Hashtable<>();
 	Dictionary<Integer, Integer> secDef_dict= new Hashtable<>();
 	Dictionary<Integer, Integer> index_dict= new Hashtable<>();
-	Dictionary<Integer, Integer> underlying_option_dict = new Hashtable<>();
+	Dictionary<Integer, Integer> underlying_option_dict = new Hashtable<>(); // 0 = Option, 1 = Underlying
 	Dictionary<Integer, String> put_call_dict = new Hashtable<>();
 	
 	// int window = 98;
@@ -152,6 +153,7 @@ public class FrontPanel extends JFrame implements EWrapper {
 	    
 	    // timer.scheduleAtFixedRate(new RemindTask2(), 10*1000, 1440 * 60 * 1000); // 10 second initial delay, the subsequent delay is so long it only runs once
 		
+	    timer.scheduleAtFixedRate(new RemindTask3(), 3*1000, 5*1000);
 	}
 	
 	class RemindTask extends TimerTask{
@@ -198,6 +200,37 @@ public class FrontPanel extends JFrame implements EWrapper {
 			onOptionPriceButton();			
 		}
 		
+	}
+	
+	class RemindTask3 extends TimerTask{
+		// This scheduled task is too check for 6:30 am and put in an order
+		public void run() {
+			Calendar currentDate = Calendar.getInstance(Locale.ENGLISH); //Get the current date
+			int hourOfDay = currentDate.get(Calendar.HOUR_OF_DAY);
+			int minOfHour = currentDate.get(Calendar.MINUTE);
+			String time;
+			
+			if (hourOfDay == 6 && minOfHour == 30) {
+				for (int i = 0; i < num_securities; i++) {
+					if (Security_data[i].for_trading && !Security_data[i].already_traded) {
+						m_client.reqCurrentTime();
+						System.out.println("Line 215 " + Security_data[i].ticker + " " + Security_data[i].recommendation + " " + Security_data[i].contracts);
+						if (Security_data[i].contracts < Security_data[i].num_to_trade && Security_data[i].recommendation.equals("buy")) {
+							Security_data[i].already_traded = true;
+							m_messages.add("Would have bought " + Security_data[i].ticker + " here at " + current_time);
+						}
+						else if (Security_data[i].contracts > 0 && Security_data[i].recommendation.equals("sell")) {
+							Security_data[i].already_traded = true;
+							m_messages.add("Would have sold " + Security_data[i].ticker + " here at " + current_time);
+						}
+						else {
+							Security_data[i].already_traded = true;
+							m_messages.add("Did not trade " + Security_data[i].ticker + " because it wasn't a buy or sell, at " + current_time);
+						}
+					}
+				}
+			}
+		}
 	}
 	
 	private String formatDate() {
@@ -263,6 +296,8 @@ public class FrontPanel extends JFrame implements EWrapper {
 		ArrayList<Integer> window = new ArrayList<Integer>();
 		ArrayList<Boolean> record_options = new ArrayList<Boolean>();
 		ArrayList<Boolean> for_trading = new ArrayList<Boolean>();
+		ArrayList<Integer> num_to_trade = new ArrayList<Integer>();
+		ArrayList<Boolean> recordUnderlying = new ArrayList<Boolean>();
 
 		
 		Scanner input = new Scanner(new File("AccountData.txt"));
@@ -277,6 +312,8 @@ public class FrontPanel extends JFrame implements EWrapper {
 			window.add(input.nextInt());
 			record_options.add(input.nextBoolean());
 			for_trading.add(input.nextBoolean());
+			num_to_trade.add(input.nextInt());
+			recordUnderlying.add(input.nextBoolean());
 			num_securities++;
 		}
 		input.close();
@@ -294,7 +331,15 @@ public class FrontPanel extends JFrame implements EWrapper {
 			Security_data[i].window = window.get(i);
 			Security_data[i].record_options = record_options.get(i);
 			Security_data[i].for_trading = for_trading.get(i);
+			Security_data[i].num_to_trade = num_to_trade.get(i);
+			Security_data[i].record_underlying = recordUnderlying.get(i);
+			Security_data[i].already_traded = false;
+			if (Security_data[i].record_underlying){
+				Security_data[i].underlying = new double [390+1][4];
+			}
 		}
+		
+
 		
 	}
 	
@@ -476,7 +521,7 @@ public class FrontPanel extends JFrame implements EWrapper {
 		});
 		
 		JButton OptionChainButton = new JButton();
-		OptionChainButton.setText("Option Info");
+		OptionChainButton.setText("Option Chain");
 		buttonPanel.add(OptionChainButton);
 		OptionChainButton.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
@@ -485,7 +530,7 @@ public class FrontPanel extends JFrame implements EWrapper {
 		});
 		
 		JButton OptionPriceButton = new JButton();
-		OptionPriceButton.setText("Req Option Prices");
+		OptionPriceButton.setText("Stream Data");
 		buttonPanel.add(OptionPriceButton);
 		OptionPriceButton.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
@@ -619,7 +664,7 @@ private void createTransPanel(){
 }
 	
 	private void onPrint() throws IOException {
-		// WRites the data to separate output files that have the data
+		// Writes the data to separate output files that have the data
 		
 		String file_name = "";
 		
@@ -662,7 +707,25 @@ private void createTransPanel(){
 			}
 			bw.close();
 		}
+			if (Security_data[i].record_underlying) {
+				file_name = Security_data[i].ticker + formatDate()+"_underlying_data.txt"; 
+				File file = new File(file_name);
+				FileWriter fw;
+				fw = new FileWriter(file.getAbsoluteFile());
+				BufferedWriter bw1 = new BufferedWriter(fw);
+				for (int l = 0; l <= 6.5 * 60; l++) {
+					bw1.write(Security_data[i].ticker + " Time index = " + l + " data = " +
+				Security_data[i].underlying[l][0] + " " + Security_data[i].underlying[l][1] + " " + 
+				Security_data[i].underlying[l][2] + " " + Security_data[i].underlying[l][3]);
+					bw1.newLine();
+					
+				}
+				
+				bw1.close();
+			}
 		}
+		m_messages.add("Complete Writing Data to File");
+		
 	}
 	
 	private void createMessagePanel() {
@@ -803,9 +866,9 @@ private void createTransPanel(){
 		// Request the info of the underlying contract to get the condID and expiration 
 		
 		long t1, t2;
-		Contract contract = new Contract();
 		
 		for (int i=0;i<num_securities;i++) {
+			Contract contract = new Contract();
 			min_expiration = 99999999;
 			
 			contract.symbol(Security_data[i].ticker);
@@ -814,6 +877,10 @@ private void createTransPanel(){
 			//contract.secType("FUT");
 			contract.currency("USD");
 			contract.exchange(Security_data[i].exchange);
+			///if (Security_data[i].ticker.equals("VXN")) {
+			///	contract.conid(13455757);
+			//}
+			
 			//contract.exchange("CME");
 
 			// System.out.println("Line 247");
@@ -828,18 +895,17 @@ private void createTransPanel(){
 		}
 		debugPrint(297);
 		m_messages.add("Complete requesting Underlying");
-		for (int i=0;i<num_securities;i++) {
-			
-		}
+
 	}
 	
 	void onUnderlyingPrice() {
 		// This gets the underlying price of each asset so it knows what options to request
 		
 		long t1, t2;
-		Contract contract = new Contract();
+		
 		
 		for (int i=0;i<num_securities;i++) {
+			Contract contract = new Contract();
 			if (Security_data[i].ticker.equals("SPX")) {
 				
 				contract.exchange("CBOE");
@@ -848,7 +914,18 @@ private void createTransPanel(){
 				contract.currency("USD");
 				contract.multiplier("100");
 				contract.localSymbol("SPX");
+				// Security_data[i].current_price = 5754;
 				//Security_data[tickTickerID].current_price = 5520;
+			}
+			else if (Security_data[i].ticker.equals("VXN")) {
+				contract.exchange("CBOE");
+				contract.conid(Security_data[i].conID);
+				// contract.tradingClass("VXN");
+				contract.secType(Security_data[i].security_type);
+				System.out.println("Line 900 " + Security_data[i].security_type);
+				contract.currency("USD");
+				contract.multiplier("1");
+				contract.localSymbol("VXN");
 			}
 			else {
 				contract.symbol(Security_data[i].ticker);
@@ -870,6 +947,7 @@ private void createTransPanel(){
 			do {
 				t2 = System.currentTimeMillis();
 			} while (t2 - t1 < 2000);
+			System.out.println("Line 925 " + Security_data[i].ticker + " " + Security_data[i].current_price);
 			m_client.cancelMktData(nextID);
 			nextID++;
 		}
@@ -886,6 +964,7 @@ private void createTransPanel(){
 		long t1, t2;
 
 		for (int i=0; i<num_securities; i++) {
+			if(Security_data[i].record_options) {
 			min_expiration = 99999999;
 			if (Security_data[i].ticker.equals("SPX") || Security_data[i].ticker.equals("SPY") || Security_data[i].ticker.equals("QQQ")) {
 				m_client.reqSecDefOptParams(nextID,
@@ -922,19 +1001,19 @@ private void createTransPanel(){
 			nextID++;
 			debugPrint2(831,i,min_expiration);
 		}
+		}
 		
 		for (int i=0; i < num_securities; i++) {
 			if(Security_data[i].record_options) {
+				Security_data[i].requested_strikes = new double[Security_data[i].window];
+				Security_data[i].process_strikes();
+				//Security_data[i].data = new double [2][window][390][6];
+				Security_data[i].data = new double [2][Security_data[i].window][390+1][10];
 				
-			
-			Security_data[i].requested_strikes = new double[Security_data[i].window];
-			Security_data[i].process_strikes();
-			//Security_data[i].data = new double [2][window][390][6];
-			Security_data[i].data = new double [2][Security_data[i].window][390+1][10];
-			Security_data[i].initialize_data();
-			for (int j = 0; j < Security_data[i].window; j++) {
-				optionsTable[i].setValueAt(Security_data[i].requested_strikes[j], j, 3);
-			}
+				Security_data[i].initialize_data();
+				for (int j = 0; j < Security_data[i].window; j++) {
+					optionsTable[i].setValueAt(Security_data[i].requested_strikes[j], j, 3);
+				}
 			}
 		}
 		
@@ -943,68 +1022,82 @@ private void createTransPanel(){
 	}
 	
 	void onOptionPriceButton() {
-		// Hopefully this gets the entire option chain streaming through
+		// Hopefully this gets the entire option chain and index info streaming through
 		
 		for (int i = 0; i < num_securities; i++) {
 			if (Security_data[i].record_options) {
 				
-			
-			for (int j = 0; j < Security_data[i].window; j++) {
-				Contract contract = new Contract();
-				if (Security_data[i].ticker.equals("SPX")) {
-					contract.symbol(Security_data[i].ticker);
-					contract.secType("OPT");
-					contract.currency("USD");
-					contract.exchange("CBOE");
-					contract.lastTradeDateOrContractMonth(todays_date);
-					contract.strike(Security_data[i].requested_strikes[j]);
-					contract.multiplier(String.valueOf(Security_data[i].multiplier));
-					contract.tradingClass(Security_data[i].tradeclass);
-				}
-				else if (Security_data[i].ticker.equals("SPY") || Security_data[i].ticker.equals("QQQ")) {
-					contract.symbol(Security_data[i].ticker);
-					contract.secType("OPT");
-					contract.currency("USD");
-					contract.exchange(Security_data[i].exchange);
-					contract.lastTradeDateOrContractMonth(todays_date);
-					contract.strike(Security_data[i].requested_strikes[j]);
-					//contract.multiplier(String.valueOf(Security_data[i].multiplier));
-					//contract.tradingClass(Security_data[i].tradeclass);
-				}
-				else {
+				for (int j = 0; j < Security_data[i].window; j++) {
+					Contract contract = new Contract();
+					if (Security_data[i].ticker.equals("SPX")) {
+						contract.symbol(Security_data[i].ticker);
+						contract.secType("OPT");
+						contract.currency("USD");
+						contract.exchange("CBOE");
+						contract.lastTradeDateOrContractMonth(todays_date);
+						contract.strike(Security_data[i].requested_strikes[j]);
+						contract.multiplier(String.valueOf(Security_data[i].multiplier));
+						contract.tradingClass(Security_data[i].tradeclass);
+					}
+					else if (Security_data[i].ticker.equals("SPY") || Security_data[i].ticker.equals("QQQ")) {
+						contract.symbol(Security_data[i].ticker);
+						contract.secType("OPT");
+						contract.currency("USD");
+						contract.exchange(Security_data[i].exchange);
+						contract.lastTradeDateOrContractMonth(todays_date);
+						contract.strike(Security_data[i].requested_strikes[j]);
+						//contract.multiplier(String.valueOf(Security_data[i].multiplier));
+						//contract.tradingClass(Security_data[i].tradeclass);
+					}
+					else {
 					
-					contract.symbol(Security_data[i].ticker);
-					contract.secType("FOP");
-					contract.currency("USD");
-					contract.exchange("CME");
-					contract.lastTradeDateOrContractMonth(todays_date);
-					contract.strike(Security_data[i].requested_strikes[j]);
-					contract.multiplier(String.valueOf(Security_data[i].multiplier));
-					contract.tradingClass(Security_data[i].tradeclass);
+						contract.symbol(Security_data[i].ticker);
+						contract.secType("FOP");
+						contract.currency("USD");
+						contract.exchange("CME");
+						contract.lastTradeDateOrContractMonth(todays_date);
+						contract.strike(Security_data[i].requested_strikes[j]);
+						contract.multiplier(String.valueOf(Security_data[i].multiplier));
+						contract.tradingClass(Security_data[i].tradeclass);
 					
+					}
+				
+					// First Request the PUT
+					contract.right("PUT");
+					put_call_dict.put(nextID, "PUT");
+					index_dict.put(nextID, i);
+					underlying_option_dict.put(nextID, 0);
+					strike_dict.put(nextID, Security_data[i].requested_strikes[j]);
+					strike_to_window_dict.put(nextID, j);
+					m_client.reqMktData(nextID,contract,"",false,false,null);
+					nextID++;
+				
+					// Then Request the Call
+					contract.right("CALL");
+					put_call_dict.put(nextID, "CALL");
+					index_dict.put(nextID, i);
+					underlying_option_dict.put(nextID, 0);
+					strike_dict.put(nextID, Security_data[i].requested_strikes[j]);
+					strike_to_window_dict.put(nextID, j);
+					m_client.reqMktData(nextID,contract,"",false,false,null);
+					nextID++;
 				}
-				
-				// First Request the PUT
-				contract.right("PUT");
-				put_call_dict.put(nextID, "PUT");
-				index_dict.put(nextID, i);
-				underlying_option_dict.put(nextID, 0);
-				strike_dict.put(nextID, Security_data[i].requested_strikes[j]);
-				strike_to_window_dict.put(nextID, j);
-				m_client.reqMktData(nextID,contract,"",false,false,null);
-				nextID++;
-				
-				// Then Request the Call
-				contract.right("CALL");
-				put_call_dict.put(nextID, "CALL");
-				index_dict.put(nextID, i);
-				underlying_option_dict.put(nextID, 0);
-				strike_dict.put(nextID, Security_data[i].requested_strikes[j]);
-				strike_to_window_dict.put(nextID, j);
-				m_client.reqMktData(nextID,contract,"",false,false,null);
-				nextID++;
-			}
 
+			}
+			if(Security_data[i].record_underlying) {
+				Contract contract = new Contract();
+				contract.symbol(Security_data[i].ticker);
+				contract.conid(Security_data[i].conID);
+				contract.secType(Security_data[i].security_type);
+				contract.currency("USD");
+				contract.exchange(Security_data[i].exchange);
+				contract.multiplier(String.valueOf(Security_data[i].multiplier));
+				contract.localSymbol("VXN");
+				index_dict.put(nextID, i);
+				underlying_option_dict.put(nextID, 1);
+				m_client.reqMktData(nextID,contract,"",false,false,null);
+				nextID++;
+				System.out.println("DEbugging on line 1101");
 			}
 		}
 	}
@@ -1015,9 +1108,9 @@ private void createTransPanel(){
 		// TODO Auto-generated method stub
 		
 		tickTickerID = index_dict.get(tickerId);
-		//System.out.println("Line 966 " + field + " " + price + " " + attrib);
+
 		if (field == 1) {
-			if (underlying_option_dict.get(tickerId) == 1 && !Security_data[tickTickerID].ticker.equals("SPX")) {
+			if (underlying_option_dict.get(tickerId) == 1 && !Security_data[tickTickerID].ticker.equals("SPX") && !Security_data[tickTickerID].ticker.equals("VXN")) {
 				Security_data[tickTickerID].current_price = price;
 				System.out.println("don't forget to reset this");
 				System.out.println(Security_data[tickTickerID].ticker +
@@ -1026,9 +1119,9 @@ private void createTransPanel(){
 			else {
 				tick_put_call = put_call_dict.get(tickerId);
 				tick_strike_to_window = strike_to_window_dict.get(tickerId);
-				/*System.out.println(Security_data[tickTickerID].ticker +
-						"" + put_call_dict.get(tickerId) + 
-						" " + " Strike = " + " " + strike_dict.get(tickerId) + " Bid = " + price + " " + tick_put_call);*/
+				//System.out.println(Security_data[tickTickerID].ticker +
+				//		"" + put_call_dict.get(tickerId) + 
+				//		" " + " Strike = " + " " + strike_dict.get(tickerId) + " Bid = " + price + " " + tick_put_call);
 				
 				Security_data[tickTickerID].process_price_data(
 						tick_put_call,
@@ -1057,16 +1150,21 @@ private void createTransPanel(){
 				optionsTable[index_dict.get(tickerId)].setValueAt(price, tick_strike_to_window, 5);
 			}
 		}
+		///
+		//if(Security_data[tickTickerID].ticker.equals("VXN")) {
+		//	System.out.println("Streaming is working on line 1156 " + price + " ticker ID = " + tickerId + " field = " + field+ " " + index_dict.get(tickerId) + " " + " " + underlying_option_dict.get(tickerId) + " " + Security_data[tickTickerID].ticker);
+		//}
 		
-		// A special field to account for SPX not having a bid or ask
-		else if (field == 4) {
-			if (underlying_option_dict.get(tickerId) == 1 && Security_data[tickTickerID].ticker.equals("SPX")) {
-				Security_data[tickTickerID].current_price = price;
-				System.out.println("don't forget to reset this");
-				System.out.println(Security_data[tickTickerID].ticker +
-						" " + " Underlying Price = " + price);
+		// A special field to account for SPX and VXN not having a bid or ask
+		if (field == 4) {
+			//System.out.println("Streaming is working on line 1160 " + price + " ticker ID = " + tickerId + " field = " + field+ " " + index_dict.get(tickerId) + " " + " " + underlying_option_dict.get(tickerId) + " " + Security_data[tickTickerID].ticker);
+			if (underlying_option_dict.get(tickerId) == 1 && (Security_data[tickTickerID].ticker.equals("SPX")|| Security_data[tickTickerID].ticker.equals("VXN"))) {
+				// Security_data[tickTickerID].current_price = price;
+				System.out.println("Line 1163" +Security_data[tickTickerID].ticker+ " = " + price);
+				if (Security_data[tickTickerID].record_underlying) {
+					Security_data[tickTickerID].process_underlying_price_data(price);
+				}
 			}
-			
 		}
 	}
 
@@ -1289,7 +1387,7 @@ private void createTransPanel(){
 		System.out.println("Line 1185 " + contractDetails);
 		//int index = findIndexofTicker(contractDetails.marketName());
 		int index = secDef_dict.get(reqId);
-		if (Security_data[index].ticker.equals("SPX") || Security_data[index].ticker.equals("SPY") || Security_data[index].ticker.equals("QQQ")){
+		if (Security_data[index].ticker.equals("SPX") || Security_data[index].ticker.equals("SPY") || Security_data[index].ticker.equals("QQQ") ||Security_data[index].ticker.equals("VXN")){
 			Security_data[index].conID = contractDetails.conid();
 		}
 		else {

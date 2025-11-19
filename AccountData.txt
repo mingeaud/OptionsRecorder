@@ -1,3 +1,5 @@
 Ticker	Exchange	SecType	Multiplier	StockforTrendData	StockExchange Window	RecordOptions ForTrading SharesToTrade RecordUnderlying
 VXN	CBOE	IND	1	QQQ	SMART	70	false	false	0 true
-QQQ	SMART	STK	1	QQQ	SMART	20	true	true	0 false
+QQQ	SMART	STK	1	QQQ	SMART	40	true	true	0 false
+VIX	CBOE	IND	1	SPY	SMART	70	false	false	0 true
+SPY	SMART	STK	1	SPY	SMART	50	true	true	0 false

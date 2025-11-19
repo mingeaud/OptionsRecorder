@@ -7,9 +7,27 @@ import java.util.Set;
 
 public class Security {
 	String ticker, exchange, security_type, stock_ticker, stock_exchange, tradeclass, recommendation;
-	int multiplier, conID, expiration, contracts, window, num_to_trade;
+	int multiplier, conID, expiration, contracts, window, num_to_trade, sizer=360;
 	double current_price, strikes[], requested_strikes[], data[][][][], underlying[][];
 	boolean record_options, for_trading, already_traded, record_underlying;
+	
+	double[] dates;
+	double temp1, temp2, temp3, temp4, temp5, temp6, temp7, temp8, temp9;
+	
+	double TR[] = new double[sizer];
+	double DM1[] = new double[sizer];
+	double negDM1[] = new double[sizer];
+	double temp10[][] = new double[sizer][3];
+	double TR_num[] = new double[sizer];
+	double DM_num[] = new double[sizer];
+	double negDM_num[] = new double[sizer];
+	double DI_num[] = new double[sizer];
+	double negDI_num[] = new double[sizer];
+	double DI_num_dif[] = new double[sizer];
+	double DI_num_sum[] = new double[sizer];
+	double DX[] = new double[sizer];
+	double ADX_num[] = new double[sizer];
+	double simpleMovAv[] = new double[sizer];
 	
 	// These are here to try to speed up organizing data to prevent the next price from coming in too fast
 	Calendar currentDate = Calendar.getInstance(Locale.ENGLISH);
@@ -297,4 +315,207 @@ public class Security {
 	    }
 
 	}
+	
+	public double[][] adx(int trailing_num){
+
+
+		
+		
+		for (int i = 0; i < sizer; i++){
+			TR[i] = 0;
+			DM1[i] = 0;
+			negDM1[i] = 0;
+			temp10[i][0] = 0;
+			temp10[i][1] = 0;
+			temp10[i][2] = 0;
+			TR_num[i] = 0;
+			DM_num[i] = 0;
+			negDM_num[i] = 0;
+			DI_num[i] = 0;
+			negDI_num[i] = 0;
+			DI_num_dif[i] = 0;
+			DI_num_sum[i] = 0;
+			DX[i] = 0;
+			ADX_num[i] = 0;
+		}
+
+		//%% Calculates TR
+		TR[1] = 0;
+		for (int i = 1; i < sizer; i++){
+			temp1 = datum[i][1];
+		    temp2 = datum[i][2];
+		    temp3 = datum[i-1][3];
+		    temp4 = temp1-temp2;
+		    temp5 = Math.abs(temp1 - temp3);
+		    temp6 = Math.abs(temp2 - temp3);
+		    temp8 = Math.max(temp4, temp5);
+		    temp9 = Math.max(temp5, temp6);
+		    temp7 = Math.max(temp8,  temp9);
+		    TR[i] = temp7;
+		    //System.out.println(data[i][0]+" "+data[i][1] + " " + data[i-1][2] + " " + temp4 + " " + temp5 + " " + temp6 + " " + TR[i]);
+		}
+	
+		temp3 = 0;
+		//%% Calculates +DM1
+		for (int i = 1; i<sizer; i++)
+		{
+			temp1 = datum[i][1] - datum[i-1][1];
+		    temp2 = datum[i-1][2] - datum[i][2];
+		    
+		    if (temp1 > temp2)
+		    {
+		    	temp3 = Math.max(temp1, 0);	
+		    	DM1[i] = temp3;
+		    }
+		    else
+		    {
+		    	DM1[i] = 0;
+		    }
+		    //System.out.println(temp1+ " " + temp2+ " " + temp3 + " " + DM1[i]);
+		}
+		
+
+
+		//%% Calculates -DM1
+		for (int i = 1; i < sizer; i++){
+			temp1 = datum[i-1][2] - datum[i][2];
+		    temp2 = datum[i][1] - datum[i-1][1];
+		    if (temp1 > temp2)
+		    {
+		    	negDM1[i] = Math.max(temp1,0);
+		    }
+		    else
+		    {
+		    	negDM1[i] = 0;
+		    }
+		    //System.out.println(negDM1[i]);
+		}
+		    
+
+		// calculates TR_num
+		temp1 = 0;
+		for (int i = 1; i <= trailing_num; i++){
+			temp1 = temp1 + TR[i];
+		}
+		    
+		TR_num[trailing_num] = temp1;
+
+		for (int i = (trailing_num + 1); i<sizer; i++)
+		{
+			 TR_num[i] = TR_num[i-1] - (TR_num[i-1]/trailing_num) + TR[i];
+			//System.out.println(TR_num[i]);
+		}
+
+		//clear temp1;
+
+		// Calculates DM_num
+		temp1 = 0;
+		for (int i = 1; i <= trailing_num; i++)
+		{
+			temp1 = temp1 + DM1[i];
+		}
+		    
+		DM_num[trailing_num] = temp1;
+		
+		for (int i = (trailing_num + 1);i<sizer; i++)
+		{
+			DM_num[i] = DM_num[i-1] - (DM_num[i-1]/trailing_num) + DM1[i];
+			//System.out.println(DM_num[i]);
+		}
+		    
+		//clear temp1;
+
+		// Calculates negDM_num
+		temp1 = 0;
+		for (int i = 1; i <= trailing_num; i++)
+		{
+			temp1 = temp1 + negDM1[i];
+		}
+		    
+		negDM_num[trailing_num] = temp1;
+		
+		for (int i = trailing_num; i < sizer; i++)
+		{
+			negDM_num[i] = negDM_num[i-1] - (negDM_num[i-1]/trailing_num) + negDM1[i];
+			//System.out.println(negDM_num[i]);
+		}
+		    
+
+		// clear temp1;
+
+		// Calculates DI_num
+		for (int i = 1; i < sizer; i++)
+		{
+			DI_num[i] = 100*DM_num[i]/TR_num[i];
+			if (TR_num[i]==0){
+				DI_num[i]=0;
+			}
+			//System.out.println(DI_num[i]);
+		}
+		
+		
+		// Calculates negDI_num
+		for (int i = trailing_num; i <sizer; i++)
+		{
+			negDI_num[i] = 100*negDM_num[i]/TR_num[i];
+			if (TR_num[i]==0){
+				negDI_num[i]=0;
+			}
+			//System.out.println(negDI_num[i]);
+		}
+		
+
+		// calculates DI_num_dif
+		for (int i = 1; i < sizer; i++)
+		{
+			DI_num_dif[i] = Math.abs(DI_num[i] - negDI_num[i]);
+			//System.out.println(DI_num_dif[i]);
+		}
+		
+
+		// Calculates DI_num_sum
+		for (int i = 1; i < sizer; i++)
+		{
+			DI_num_sum[i] = DI_num[i] + negDI_num[i];
+		}
+		
+
+		//cacluates DX
+		for (int i = 1; i < sizer; i++)
+		{
+			DX[i] = 100*DI_num_dif[i]/DI_num_sum[i];
+			if (DI_num_sum[i]==0){
+				DX[i]=0;
+			}
+		}
+		
+		temp1 = 0;
+		//Caclualtes ADX
+		for (int i = trailing_num; i <= 2 * trailing_num +1; i++)
+		{
+			
+			temp1 = temp1 + DX[i];
+		}
+		    
+		
+		ADX_num[2*trailing_num + 1] = temp1 / trailing_num;
+		for (int i = (2 * trailing_num + 2); i < sizer; i++)
+		{
+			ADX_num[i] = (ADX_num[i-1]*(trailing_num-1)+DX[i])/trailing_num;
+			//System.out.println(ADX_num[i]);
+		}
+
+		    
+		//clear temp1;
+		for (int i = 0; i < sizer; i++)
+		{
+			temp10[i][0] = DI_num[i];
+			temp10[i][1] = negDI_num[i];
+			temp10[i][2] = ADX_num[i];
+			
+		}
+		
+		//%% Output son!!!
+		return temp10;
+}
 }

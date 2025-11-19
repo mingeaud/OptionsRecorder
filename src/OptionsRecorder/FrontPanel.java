@@ -917,7 +917,7 @@ private void createTransPanel(){
 				// Security_data[i].current_price = 5754;
 				//Security_data[tickTickerID].current_price = 5520;
 			}
-			else if (Security_data[i].ticker.equals("VXN")) {
+			else if (Security_data[i].ticker.equals("VXN") || Security_data[i].ticker.equals("VIX")) {
 				contract.exchange("CBOE");
 				contract.conid(Security_data[i].conID);
 				// contract.tradingClass("VXN");
@@ -925,7 +925,7 @@ private void createTransPanel(){
 				System.out.println("Line 900 " + Security_data[i].security_type);
 				contract.currency("USD");
 				contract.multiplier("1");
-				contract.localSymbol("VXN");
+				contract.localSymbol(Security_data[i].ticker);
 			}
 			else {
 				contract.symbol(Security_data[i].ticker);
@@ -1092,7 +1092,7 @@ private void createTransPanel(){
 				contract.currency("USD");
 				contract.exchange(Security_data[i].exchange);
 				contract.multiplier(String.valueOf(Security_data[i].multiplier));
-				contract.localSymbol("VXN");
+				contract.localSymbol(Security_data[i].ticker); // This was "VXN on 11/12/2025
 				index_dict.put(nextID, i);
 				underlying_option_dict.put(nextID, 1);
 				m_client.reqMktData(nextID,contract,"",false,false,null);
@@ -1110,7 +1110,8 @@ private void createTransPanel(){
 		tickTickerID = index_dict.get(tickerId);
 
 		if (field == 1) {
-			if (underlying_option_dict.get(tickerId) == 1 && !Security_data[tickTickerID].ticker.equals("SPX") && !Security_data[tickTickerID].ticker.equals("VXN")) {
+			if (underlying_option_dict.get(tickerId) == 1 && !Security_data[tickTickerID].ticker.equals("SPX") && !Security_data[tickTickerID].ticker.equals("VXN")
+					&& !Security_data[tickTickerID].ticker.equals("VIX")) {
 				Security_data[tickTickerID].current_price = price;
 				System.out.println("don't forget to reset this");
 				System.out.println(Security_data[tickTickerID].ticker +
@@ -1158,7 +1159,7 @@ private void createTransPanel(){
 		// A special field to account for SPX and VXN not having a bid or ask
 		if (field == 4) {
 			//System.out.println("Streaming is working on line 1160 " + price + " ticker ID = " + tickerId + " field = " + field+ " " + index_dict.get(tickerId) + " " + " " + underlying_option_dict.get(tickerId) + " " + Security_data[tickTickerID].ticker);
-			if (underlying_option_dict.get(tickerId) == 1 && (Security_data[tickTickerID].ticker.equals("SPX")|| Security_data[tickTickerID].ticker.equals("VXN"))) {
+			if (underlying_option_dict.get(tickerId) == 1 && (Security_data[tickTickerID].ticker.equals("SPX")|| Security_data[tickTickerID].ticker.equals("VXN") || Security_data[tickTickerID].ticker.equals("VIX"))) {
 				// Security_data[tickTickerID].current_price = price;
 				System.out.println("Line 1163" +Security_data[tickTickerID].ticker+ " = " + price);
 				if (Security_data[tickTickerID].record_underlying) {
@@ -1384,10 +1385,12 @@ private void createTransPanel(){
 	public void contractDetails(int reqId, ContractDetails contractDetails) {
 		// TODO Auto-generated method stub
 		System.out.println("Line 1185 " + contractDetails.realExpirationDate());
+		System.out.println("Line 1185 secDef_dict " +   secDef_dict.get(reqId));
 		System.out.println("Line 1185 " + contractDetails);
 		//int index = findIndexofTicker(contractDetails.marketName());
 		int index = secDef_dict.get(reqId);
-		if (Security_data[index].ticker.equals("SPX") || Security_data[index].ticker.equals("SPY") || Security_data[index].ticker.equals("QQQ") ||Security_data[index].ticker.equals("VXN")){
+		if (Security_data[index].ticker.equals("SPX") || Security_data[index].ticker.equals("SPY") || Security_data[index].ticker.equals("QQQ") ||Security_data[index].ticker.equals("VXN") || Security_data[tickTickerID].ticker.equals("VIX")){
+			System.out.println("Line 1392 " + Security_data[index].ticker + " " + contractDetails.conid());
 			Security_data[index].conID = contractDetails.conid();
 		}
 		else {

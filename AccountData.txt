@@ -1,5 +1,5 @@
-Ticker	Exchange	SecType	Multiplier	StockforTrendData	StockExchange Window	RecordOptions ForTrading SharesToTrade RecordUnderlying
-VXN	CBOE	IND	1	QQQ	SMART	70	false	false	0 true
-QQQ	SMART	STK	1	QQQ	SMART	40	true	true	0 false
-VIX	CBOE	IND	1	SPY	SMART	70	false	false	0 true
-SPY	SMART	STK	1	SPY	SMART	50	true	true	0 false
+This column header line is too long. Use the Excel sheet for copy and paste
+VXN	CBOE	IND	1	QQQ	SMART	70	FALSE	FALSE	0	TRUE	10	4	400	30	3	400	10	1	300	10	5	200
+QQQ	SMART	STK	1	QQQ	SMART	40	TRUE	TRUE	0	FALSE	10	4	400	30	3	400	10	1	300	10	5	200
+VIX	CBOE	IND	1	SPY	SMART	70	FALSE	FALSE	0	TRUE	25	3	400	10	1	100	15	1	100	25	3	99999999
+SPY	SMART	STK	1	SPY	SMART	50	TRUE	TRUE	0	FALSE	25	3	400	10	1	100	15	1	100	25	3	99999999
